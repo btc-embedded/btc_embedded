@@ -2,13 +2,13 @@ from distutils.core import setup
 
 setup(
     name='btc_embedded',
-    version='23.2.0',
+    version='23.2.2',
     packages=['btc_embedded'],
     license='MIT',
     description='API wrapper for BTC EmbeddedPlatform 23.2p0 REST API',
     author='Thabo Krick',
     author_email='thabo.krick@btc-embedded.com',
-    url='https://github.com/btc-embedded/btc-ci-workflow/examples/api',
+    url='https://github.com/btc-embedded/btc-embedded',
     install_requires=[ 'requests', 'pyyaml' ],
     classifiers=[
         'Development Status :: 4 - Beta',
