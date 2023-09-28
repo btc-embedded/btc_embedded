@@ -17,4 +17,4 @@ ep = EPRestApi()
 # create an empty test project
 ep.post('profiles')
 ```
-Further details can be found in our [example repository](https://github.com/btc-embedded/btc-ci-workflow).
+Further details and examples can be found in our [example repository](https://github.com/btc-embedded/btc-ci-workflow).

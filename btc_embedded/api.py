@@ -4,7 +4,8 @@ import subprocess
 import time
 
 import requests
-from config import get_global_config
+
+from btc_embedded.config import get_global_config
 
 
 class EPRestApi:

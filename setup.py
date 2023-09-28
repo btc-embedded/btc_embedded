@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='btc_embedded',
-    version='23.2.2',
+    version='23.2.3',
     packages=['btc_embedded'],
     license='MIT',
     description='API wrapper for BTC EmbeddedPlatform 23.2p0 REST API',
