@@ -1,5 +1,6 @@
 import fnmatch
 import os
+from importlib import resources
 
 import yaml
 
@@ -11,10 +12,9 @@ def get_global_config():
 def __get_global_config():
     """Returns the global config from the parent dir of the
     file 'btc_config.py' with the project-specific config."""
-    thisfile = os.path.abspath(__file__).replace('\\', '/')
-    global_config_file = os.path.dirname(thisfile) + '/btc_config.yml'
-    config = __load_config(global_config_file)
-    return config, global_config_file
+    with resources.path("btc_embedded", "btc_config.yml") as global_config_file:
+        config = __load_config(str(global_config_file))
+        return config, global_config_file
 
 def get_project_specific_config(project_directory=os.getcwd(), project_config=None):
     """Returns the project-specific config, which is the first file
@@ -66,19 +66,19 @@ def get_vector_gen_config(scope_uid, config=None):
         config = get_global_config()
     # engine settings
     engine_settings = {}
-    if config['globalTimeout']: engine_settings['timeoutSeconds'] = config['globalTimeout']
-    if config['threshold']: engine_settings['handlingRateThreshold'] = config['threshold']
+    if 'globalTimeout' in config: engine_settings['timeoutSeconds'] = config['globalTimeout']
+    if 'threshold' in config: engine_settings['handlingRateThreshold'] = config['threshold']
     
     if 'CV' in config['engines']:
         # prepare cv engine
         cv_settings = { 'name' : 'CV' }
-        if config['cvTimeoutSeconds']: cv_settings['timeoutSecondsPerSubsystem'] = config['cvTimeoutSeconds']
-        if config['cvPropertyTimeoutSeconds']: cv_settings['timeoutSecondsPerProperty'] = config['cvPropertyTimeoutSeconds']
-        if config['cvSearchDepth']: cv_settings['searchDepthSteps'] = config['cvSearchDepth']
-        if config['loopUnrollLimit']: cv_settings['loopUnroll'] = config['loopUnrollLimit']
-        if config['maximumNumberOfThreads']: cv_settings['maximumNumberOfThreads'] = config['maximumNumberOfThreads']
-        if config['parallelExecutionMode']: cv_settings['parallelExecutionMode'] = config['parallelExecutionMode']
-        if config['modelCheckers']:
+        if 'cvTimeoutSeconds' in config: cv_settings['timeoutSecondsPerSubsystem'] = config['cvTimeoutSeconds']
+        if 'cvPropertyTimeoutSeconds' in config: cv_settings['timeoutSecondsPerProperty'] = config['cvPropertyTimeoutSeconds']
+        if 'cvSearchDepth' in config: cv_settings['searchDepthSteps'] = config['cvSearchDepth']
+        if 'loopUnrollLimit' in config: cv_settings['loopUnroll'] = config['loopUnrollLimit']
+        if 'maximumNumberOfThreads' in config: cv_settings['maximumNumberOfThreads'] = config['maximumNumberOfThreads']
+        if 'parallelExecutionMode' in config: cv_settings['parallelExecutionMode'] = config['parallelExecutionMode']
+        if 'modelCheckers' in config:
             cv_settings['coreEngines'] = []
             [cv_settings['coreEngines'].append({ 'name' : model_checker }) for model_checker in config['modelCheckers']]
         # add cv engine to engine settings
@@ -87,13 +87,13 @@ def get_vector_gen_config(scope_uid, config=None):
     if 'ATG' in config['engines']:
         # prepare cv engine
         atg_settings = { 'name' : 'ATG' }
-        if config['atgTimeoutSeconds']: atg_settings['timeoutSecondsPerSubsystem'] = config['atgTimeoutSeconds']
+        if 'atgTimeoutSeconds' in config: atg_settings['timeoutSecondsPerSubsystem'] = config['atgTimeoutSeconds']
         # add cv engine to engine settings
         engine_settings['engineAtg'] = atg_settings
 
     vector_generation_config['engineSettings'] = engine_settings
     # pll
-    if config['pllString']: vector_generation_config['pllString'] = config['pllString']
+    if 'pllString' in config: vector_generation_config['pllString'] = config['pllString']
     return vector_generation_config
 
 def __load_config(config_file):

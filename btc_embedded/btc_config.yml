@@ -6,7 +6,7 @@
 # ------------------------------------------------------------------
 
 # Basic settings: could be component-specific
-pllString: STM; MCDC
+pllString: MCDC
 threshold: 100      # at what percentage value should the vector generation stop?
 globalTimeout: 300  # in seconds
 engines:            # Allowed: ATG, CV or both
@@ -24,6 +24,7 @@ maximumNumberOfMatlabs: 1
 loopUnrollLimit: 10
 modelCheckers:      # Allowed: SMIBMC, VIS, AUTOFXP, CBMC, ISAT
 - ISAT
+- CBMC
 
 # General settings
 matlabVersion: MATLAB R2022b (64-bit)

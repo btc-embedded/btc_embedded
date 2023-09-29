@@ -1,5 +1,6 @@
 import datetime
 import os
+from importlib import resources
 
 
 # 
@@ -18,8 +19,8 @@ def create_test_report_summary(results, report_title='BTC Test Report Summary', 
     - eppPath (path to the *.epp file)
     - reportPath (path to the project's html report)
     """
-    thisfile = os.path.abspath(__file__).replace('\\', '/')
-    BTC_SUMMARY_REPORT_TEMPLATE = os.path.join(os.path.dirname(thisfile), 'btc_summary_report.template')
+    with resources.path("btc_embedded", "btc_summary_report.template") as template_file:
+        BTC_SUMMARY_REPORT_TEMPLATE = str(template_file)
     # aggregate total_duration and overall_status
     total_duration = sum(project['duration'] for project in results)
     overall_status = "ERROR" if any(project["testResult"] == "ERROR" for project in results) else ("FAILED" if any(project["testResult"] == "FAILED" for project in results) else "PASSED")
