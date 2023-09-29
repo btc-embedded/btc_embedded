@@ -69,7 +69,7 @@ def get_vector_gen_config(scope_uid, config=None):
     if 'globalTimeout' in config: engine_settings['timeoutSeconds'] = config['globalTimeout']
     if 'threshold' in config: engine_settings['handlingRateThreshold'] = config['threshold']
     
-    if 'CV' in config['engines']:
+    if 'engines' in config and 'CV' in config['engines']:
         # prepare cv engine
         cv_settings = { 'name' : 'CV' }
         if 'cvTimeoutSeconds' in config: cv_settings['timeoutSecondsPerSubsystem'] = config['cvTimeoutSeconds']
@@ -84,7 +84,7 @@ def get_vector_gen_config(scope_uid, config=None):
         # add cv engine to engine settings
         engine_settings['engineCv'] = cv_settings
 
-    if 'ATG' in config['engines']:
+    if 'engines' in config and 'ATG' in config['engines']:
         # prepare cv engine
         atg_settings = { 'name' : 'ATG' }
         if 'atgTimeoutSeconds' in config: atg_settings['timeoutSecondsPerSubsystem'] = config['atgTimeoutSeconds']

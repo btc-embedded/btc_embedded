@@ -1,0 +1,1 @@
+include btc_embedded/btc_config.yml btc_embedded/btc_summary_report.template
