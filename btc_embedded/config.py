@@ -4,6 +4,7 @@ from importlib import resources
 
 import yaml
 
+BTC_CONFIG_ENVVAR_NAME = 'BTC_API_CONFIG_FILE'
 
 def get_global_config():
     config, _ = __get_global_config()
@@ -11,10 +12,17 @@ def get_global_config():
 
 def __get_global_config():
     """Returns the global config from the parent dir of the
-    file 'btc_config.py' with the project-specific config."""
-    with resources.path("btc_embedded", "btc_config.yml") as global_config_file:
-        config = __load_config(str(global_config_file))
+    file 'btc_config.py' with the default configuration"""
+    # Option A: set via environment variable
+    if BTC_CONFIG_ENVVAR_NAME in os.environ and os.path.isfile(os.environ[BTC_CONFIG_ENVVAR_NAME]):
+        global_config_file_path = os.environ[BTC_CONFIG_ENVVAR_NAME]
+        config = __load_config(global_config_file_path)
         return config, global_config_file
+    # Option B: use defaults shipped with this module
+    else:
+        with resources.path("btc_embedded", "btc_config.yml") as global_config_file:
+            config = __load_config(str(global_config_file))
+            return config, global_config_file
 
 def get_project_specific_config(project_directory=os.getcwd(), project_config=None):
     """Returns the project-specific config, which is the first file
