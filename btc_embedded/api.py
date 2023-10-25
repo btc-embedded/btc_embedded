@@ -192,10 +192,11 @@ class EPRestApi:
         """Sets the configured compiler. If no config object is passed in, the default config will be used.
         For Linux/Docker based scenarios, the config has no effect."""
         try:
+            if not (config and 'compiler' in config):
+                config = get_global_config()
             if platform.system() == 'Windows':
-                if config['compiler']:
-                    preferences = [ { 'preferenceName' : 'GENERAL_COMPILER_SETTING', 'preferenceValue' : config['compiler'] } ]
-                    self.put_req('preferences', preferences)
+                preferences = [ { 'preferenceName' : 'GENERAL_COMPILER_SETTING', 'preferenceValue' : config['compiler'] } ]
+                self.put_req('preferences', preferences)
             else: # linux/docker
                 self.put_req('preferences', [ { 'preferenceName' : 'GENERAL_COMPILER_SETTING', 'preferenceValue' : 'GCC (64bit)' } ])
         except Exception as e:
