@@ -10,7 +10,7 @@ from btc_embedded.config import get_global_config
 
 class EPRestApi:
     #Starter for the EP executable
-    def __init__(self, host='http://localhost', port=1337, version=None, install_location=None, lic='', config=None, use_docker=False):
+    def __init__(self, host='http://localhost', port=1337, version=None, install_root=None, install_location=None, lic='', config=None):
         """
         Wrapper for the BTC EmbeddedPlatform REST API
         - when created without arguments, it uses the default install location & version defined in the global config (btc_config.yml)
@@ -21,9 +21,12 @@ class EPRestApi:
            'docker run -p 1337:8080 -v "/my/workdir:/my/workdir" btces/ep'
         to run the BTC EmbeddedPlatform docker image.
         """
-        if not (port and version and install_location) and not config:
-            config = get_global_config()
-        if config and config['installationRoot'] and config['epVersion']:
+        # use default config, if no config was specified
+        if not config: config = get_global_config()
+        # set install location based on install_root and version if set explicitly
+        if version and install_root: install_location = f"{install_root}/ep{version}"
+        # fallback: determine based on config
+        if not (version and install_location) and 'installationRoot' in config and 'epVersion' in config:
             version = config['epVersion']
             install_location = f"{config['installationRoot']}/ep{config['epVersion']}"
         self._PORT_ = str(port)
@@ -32,8 +35,11 @@ class EPRestApi:
         self.actively_started = False
         if not self.is_rest_service_available():
             if platform.system() == 'Windows':
+                # check if we have what we need
+                if not (version and install_location): raise Exception("Cannot start BTC EmbeddedPlatform. Arguments version and install_location or install_root directory must be specified or configured in a config file (installationRoot)")
+                # all good -> prepare start command for BTC EmbeddedPlatform
                 appdata_location = os.environ['APPDATA'].replace('\\', '/') + f"/BTC/ep/{version}/"
-                print('Waiting for BTC EmbeddedPlatform to be available:')
+                print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
                 ml_port = 29300 + (port % 100)
                 if ml_port == port:
                     ml_port -= 100

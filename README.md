@@ -2,12 +2,18 @@
 
 With this API wrapper you can automate your test workflows for embedded software on models and code using BTC EmbeddedPlatform via Python.
 
-### Installing the package:
+## Installing the package
 ```sh
 $ pip install btc_embedded
 ```
+What can I do if my machine doesn't allow pip access to the internet?
+- Check with colleagues / the IT team if your company hosts a mirror of the public repository in your local network and use that instead.
+- Plan B:
+    - download / clone the module's public repository: https://github.com/btc-embedded/btc_embedded
+    - open a terminal and navigate into the btc_embedded directory
+    - call **pip install .** (including the dot)
 
-### Using the API wrapper
+## Using the API wrapper
 ```python
 from btc_embedded.api import EPRestApi
 
