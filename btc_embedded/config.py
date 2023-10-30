@@ -17,7 +17,7 @@ def __get_global_config():
     if BTC_CONFIG_ENVVAR_NAME in os.environ and os.path.isfile(os.environ[BTC_CONFIG_ENVVAR_NAME]):
         global_config_file_path = os.environ[BTC_CONFIG_ENVVAR_NAME]
         config = __load_config(global_config_file_path)
-        return config, global_config_file
+        return config, global_config_file_path
     # Option B: use defaults shipped with this module
     else:
         with resources.path("btc_embedded", "btc_config.yml") as global_config_file:
