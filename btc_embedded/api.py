@@ -21,6 +21,10 @@ class EPRestApi:
            'docker run -p 1337:8080 -v "/my/workdir:/my/workdir" btces/ep'
         to run the BTC EmbeddedPlatform docker image.
         """
+        self._PORT_ = str(port)
+        self._HOST_ = host
+        self.definitively_closed = False
+        self.actively_started = False
         # use default config, if no config was specified
         if not config: config = get_global_config()
         # set install location based on install_root and version if set explicitly
@@ -29,12 +33,9 @@ class EPRestApi:
         if not (version and install_location) and 'installationRoot' in config and 'epVersion' in config:
             version = config['epVersion']
             install_location = f"{config['installationRoot']}/ep{config['epVersion']}"
-        self._PORT_ = str(port)
-        self._HOST_ = host
-        self.definitively_closed = False
-        self.actively_started = False
         if not self.is_rest_service_available():
             if platform.system() == 'Windows':
+                headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
                 # check if we have what we need
                 if not (version and install_location): raise Exception("Cannot start BTC EmbeddedPlatform. Arguments version and install_location or install_root directory must be specified or configured in a config file (installationRoot)")
                 # all good -> prepare start command for BTC EmbeddedPlatform
@@ -45,7 +46,7 @@ class EPRestApi:
                     ml_port -= 100
                 args = f"{install_location}/rcp/ep.exe" + \
                     ' -clearPersistedState' + \
-                    ' -application' + " ep.application.headless" + \
+                    ' -application' + ' ' + headless_application_id + \
                     ' -nosplash' + \
                     ' -vmargs' + \
                     ' -Dep.runtime.batch=ep' + \
@@ -208,6 +209,7 @@ class EPRestApi:
         except Exception as e:
             # needed because the API reacts weird when the compiler is already configured
             pass
+
 
 # if called directly, starts EP based on the global config
 if __name__ == '__main__':
