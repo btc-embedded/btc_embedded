@@ -37,7 +37,18 @@ modelCheckers:                # Allowed: SMIBMC, VIS, AUTOFXP, CBMC, ISAT
 - CBMC
 
 # General settings
-matlabVersion: MATLAB R2022b (64-bit)
-compiler: MinGW64 (64bit)
 installationRoot: C:/Program Files/BTC
 epVersion: 23.2p0
+
+# Preferences: key-value pairs according to
+# documentation/User Guide/BTC EmbeddedPlatform Preference Configuration Guide.pdf
+# - any relative paths will be resolved to the parent directory of the file
+#   indicated by the environment variable BTC_API_CONFIG_FILE
+# - the existance of the env var is mandatory for using relative path.
+preferences:
+  - GENERAL_MATLAB_CUSTOM_VERSION: MATLAB R2022b (64-bit)
+  - GENERAL_COMPILER_SETTING: MinGW64 (64bit)
+  - REQUIREMENT_BEHAVIOR_ONLY_IN_LEAVES: true
+  - SIMULATION_MIL_NUMBER_OF_MATLAB_INSTANCES: 1
+  - REPORT_TEMPLATE_FOLDER: templates
+  - SV_GEN_HEURISTIC: ATG

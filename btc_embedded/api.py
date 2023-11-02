@@ -5,7 +5,7 @@ import time
 
 import requests
 
-from btc_embedded.config import get_global_config
+from btc_embedded.config import BTC_CONFIG_ENVVAR_NAME, get_global_config
 
 
 class EPRestApi:
@@ -44,7 +44,7 @@ class EPRestApi:
                 ml_port = 29300 + (port % 100)
                 if ml_port == port:
                     ml_port -= 100
-                args = f"{install_location}/rcp/ep.exe" + \
+                args = f'"{install_location}/rcp/ep.exe"' + \
                     ' -clearPersistedState' + \
                     ' -application' + ' ' + headless_application_id + \
                     ' -nosplash' + \
@@ -61,12 +61,14 @@ class EPRestApi:
                 self.actively_started = True
         else:
             print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{port}')
+            self.apply_preferences(config)
             return
         print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{port}')
         while not self.is_rest_service_available():
             time.sleep(2)
             print('.', end='')
         print('\nBTC EmbeddedPlatform has started.')
+        self.apply_preferences(config)
 
     # closes the application
     def close_application(self):
@@ -195,20 +197,70 @@ class EPRestApi:
     def poll_long_running(self, jobID):
         return self.get_req('/progress?progress-id=' + jobID)
 
-    def set_compiler(self, config=None):
+    def set_compiler(self, config=None, value=None):
         """Sets the configured compiler. If no config object is passed in, the default config will be used.
         For Linux/Docker based scenarios, the config has no effect."""
         try:
-            if not (config and 'compiler' in config):
+            if not value and not (config and 'compiler' in config):
                 config = get_global_config()
+                value = config['compiler']
             if platform.system() == 'Windows':
-                preferences = [ { 'preferenceName' : 'GENERAL_COMPILER_SETTING', 'preferenceValue' : config['compiler'] } ]
+                preferences = [ { 'preferenceName' : 'GENERAL_COMPILER_SETTING', 'preferenceValue' : value } ]
                 self.put_req('preferences', preferences)
             else: # linux/docker
                 self.put_req('preferences', [ { 'preferenceName' : 'GENERAL_COMPILER_SETTING', 'preferenceValue' : 'GCC (64bit)' } ])
         except Exception as e:
             # needed because the API reacts weird when the compiler is already configured
             pass
+
+    def apply_preferences(self, config):
+        """Applies the preferences defined in the config object"""
+        if config and 'preferences' in config:
+            preferences = []
+            for pref_key in config['preferences']:
+                # special handling for matlab version
+                if pref_key == 'GENERAL_MATLAB_CUSTOM_VERSION':
+                    preferences.append( { 'preferenceName' : 'GENERAL_MATLAB_VERSION', 'preferenceValue': 'CUSTOM' } )
+                    preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': config['preferences'][pref_key] })
+                # special handling for compiler
+                elif pref_key == 'GENERAL_COMPILER_SETTING':
+                    self.set_compiler(value=config['preferences'][pref_key])
+                elif pref_key == 'REPORT_TEMPLATE_FOLDER':
+                    template_folder = self.rel_to_abs(config['preferences'][pref_key])
+                    if template_folder: preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': template_folder })
+                # all other cases
+                else:
+                    preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': config['preferences'][pref_key] })
+            
+            # apply preferences
+            try:
+                self.put('preferences', preferences)
+                print(f"Applied preferences from the config")
+            except (Exception):
+                # if it fails to apply all preferences, apply individually
+                successfully_applied = 0
+                for pref in preferences:
+                    try:
+                        self.put('preferences', [pref]) # apply single pref
+                        successfully_applied += 1
+                    except Exception:
+                        print(f"Failed to apply preference {pref}")
+                print(f"Successfully applied {successfully_applied} out of {len(preferences)} preferences.")
+
+    def rel_to_abs(self, rel_path):
+        """Converts a relative path to an absolute path using the
+        parent directory of the file indicated by the env var
+        BTC_API_CONFIG_FILE as the root dir.
+        Returns None if the env var is not set"""
+        if os.path.isabs(rel_path):
+            # directly return path because it's already absolute
+            return rel_path 
+        elif BTC_CONFIG_ENVVAR_NAME in os.environ:
+            # Create absolute path using root dir
+            root_dir = os.path.dirname(os.environ[BTC_CONFIG_ENVVAR_NAME])
+            return os.path.join(root_dir, rel_path)
+        print(f"Cannot convert relative path to absolute path because the environment variable {BTC_CONFIG_ENVVAR_NAME} is not set.")
+        return None
 
 
 # if called directly, starts EP based on the global config
