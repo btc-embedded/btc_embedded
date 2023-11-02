@@ -217,7 +217,7 @@ class EPRestApi:
         """Applies the preferences defined in the config object"""
         if config and 'preferences' in config:
             preferences = []
-            for pref_key in config['preferences']:
+            for pref_key in list(config['preferences'].keys()):
                 # special handling for matlab version
                 if pref_key == 'GENERAL_MATLAB_CUSTOM_VERSION':
                     preferences.append( { 'preferenceName' : 'GENERAL_MATLAB_VERSION', 'preferenceValue': 'CUSTOM' } )
