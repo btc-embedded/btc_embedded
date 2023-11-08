@@ -7,6 +7,7 @@ import requests
 
 from btc_embedded.config import BTC_CONFIG_ENVVAR_NAME, get_global_config
 
+HEADERS = {'Accept': 'application/json, text/plain'}
 
 class EPRestApi:
     #Starter for the EP executable
@@ -130,7 +131,7 @@ class EPRestApi:
         if not 'progress' in urlappendix:
             # print this unless it's a progress query (to avoid flooding the console)
             if message: print(message)
-        response = requests.get(self._url(urlappendix.replace('\\', '/').replace(' ', '%20')))
+        response = requests.get(self._url(urlappendix.replace('\\', '/').replace(' ', '%20')), headers=HEADERS)
         if not response.ok:
             raise Exception(f"Error during request GET {urlappendix}: {response.status_code}: {response.content}")
         return self.check_long_running(response)
@@ -138,7 +139,7 @@ class EPRestApi:
     # Performs a delete request on the given url extension
     def delete_req(self, urlappendix, message=None):
         if message: print(message)
-        response = requests.delete(self._url(urlappendix.replace('\\', '/').replace(' ', '%20')))
+        response = requests.delete(self._url(urlappendix.replace('\\', '/').replace(' ', '%20')), headers=HEADERS)
         if not response.ok:
             raise Exception(f"Error during request DELETE {urlappendix}: {response.status_code}: {response.content}")
         return self.check_long_running(response)
@@ -150,9 +151,9 @@ class EPRestApi:
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
         if message: print(message)
         if requestBody == None:
-            response = requests.post(self._url(url))
+            response = requests.post(self._url(url), headers=HEADERS)
         else:
-            response = requests.post(self._url(url),json=requestBody)
+            response = requests.post(self._url(url), json=requestBody, headers=HEADERS)
         if not response.ok:
             raise Exception(f"Error during request POST {url}: {response.status_code}: {response.content}")
         return self.check_long_running(response)
@@ -162,9 +163,9 @@ class EPRestApi:
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
         if message: print(message)
         if requestBody == None:
-            response = requests.put(self._url(url))
+            response = requests.put(self._url(url), headers=HEADERS)
         else:
-            response = requests.put(self._url(url),json=requestBody)
+            response = requests.put(self._url(url), json=requestBody, headers=HEADERS)
         if not response.ok:
             raise Exception(f"Error during request PUT {url}: {response}")
         return self.check_long_running(response)
