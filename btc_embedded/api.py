@@ -7,7 +7,7 @@ import requests
 
 from btc_embedded.config import BTC_CONFIG_ENVVAR_NAME, get_global_config
 
-HEADERS = {'Accept': 'application/json, text/plain'}
+HEADERS = {'Accept': 'application/json, text/plain', 'Content-Type' : 'application/json'}
 
 class EPRestApi:
     #Starter for the EP executable
@@ -131,7 +131,7 @@ class EPRestApi:
         if not 'progress' in urlappendix:
             # print this unless it's a progress query (to avoid flooding the console)
             if message: print(message)
-        response = requests.get(self._url(urlappendix.replace('\\', '/').replace(' ', '%20')), headers=HEADERS)
+        response = requests.get(self._url(urlappendix.replace('\\', '/').replace(' ', '%20')))
         if not response.ok:
             raise Exception(f"Error during request GET {urlappendix}: {response.status_code}: {response.content}")
         return self.check_long_running(response)
