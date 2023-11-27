@@ -33,4 +33,4 @@ What can I do if my machine doesn't allow pip access to the internet?
 - A license server must be configured a value such as 27000@myserver.myorg in one of the following ways:
     - As the value of the property **licenseLocation** in the global or project-specific btc_config.yml
     - As the value of the constructor argument **license_location** when creating the EPRestApi() object in Python
-    - As the value of the registry key called **OSCCSD_LICENSE_FILE** (automatically set when using the license dialog of the GUI)
+    - As the value of the registry key called **OSCCSD_LICENSE_FILE** in "HKEY_CURRENT_USER/SOFTWARE/FLEXlm License Manager" (automatically set when using the license dialog of the GUI)
