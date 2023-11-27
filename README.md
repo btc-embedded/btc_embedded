@@ -30,7 +30,7 @@ What can I do if my machine doesn't allow pip access to the internet?
 ## Prerequisites on the runner
 - BTC EmbeddedPlatform must be installed incl. the REST Server Addon (unless you use the container image)
 - The Matlab versions you intend to use must be integrated with BTC EmbeddedPlatform (can be selected during installation)
-- A license server must be configured a value such as **27000@myserver.myorg** in one of the following ways:
+- A license server must be configured a value such as 27000@myserver.myorg in one of the following ways:
     - As the value of the property **licenseLocation** in the global or project-specific btc_config.yml
     - As the value of the constructor argument **license_location** when creating the EPRestApi() object in Python
     - As the value of the registry key called **OSCCSD_LICENSE_FILE** (automatically set when using the license dialog of the GUI)
