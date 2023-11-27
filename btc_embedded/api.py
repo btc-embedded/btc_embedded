@@ -13,7 +13,7 @@ DATE_FORMAT = '%d-%b-%Y %H:%M:%S'
 
 class EPRestApi:
     #Starter for the EP executable
-    def __init__(self, host='http://localhost', port=1337, version=None, install_root=None, install_location=None, lic='', config=None):
+    def __init__(self, host='http://localhost', port=1337, version=None, install_root=None, install_location=None, lic='', config=None, license_location=None):
         """
         Wrapper for the BTC EmbeddedPlatform REST API
         - when created without arguments, it uses the default install 
@@ -63,6 +63,8 @@ class EPRestApi:
                     ' -Dep.runtime.workdir=BTC/ep/' + version + '/' + self._PORT_ + \
                     ' -Dep.licensing.package=' + lic + \
                     ' -Dep.rest.port=' + self._PORT_
+                if license_location or config and 'licenseLocation' in config:
+                    args += f"-Dep.licensing.location={(license_location or config['licenseLocation'])}"
                 subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
                 self.actively_started = True
         else:

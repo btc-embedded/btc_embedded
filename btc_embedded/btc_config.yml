@@ -39,6 +39,7 @@ modelCheckers:                # Allowed: SMIBMC, VIS, AUTOFXP, CBMC, ISAT
 # General settings
 installationRoot: C:/Program Files/BTC
 epVersion: 23.2p0
+#licenseLocation: 27000@10.18.2.1
 
 # Preferences: key-value pairs according to
 # documentation/User Guide/BTC EmbeddedPlatform Preference Configuration Guide.pdf
