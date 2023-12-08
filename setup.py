@@ -6,7 +6,7 @@ setup(
     packages=['btc_embedded'],
     include_package_data=True,
     license='MIT',
-    description='API wrapper for BTC EmbeddedPlatform 23.2p0 REST API',
+    description='API wrapper for BTC EmbeddedPlatform 23.3p0 REST API',
     author='Thabo Krick',
     author_email='thabo.krick@btc-embedded.com',
     url='https://github.com/btc-embedded/btc-embedded',
