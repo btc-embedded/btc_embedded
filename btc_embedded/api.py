@@ -2,7 +2,6 @@ import os
 import platform
 import subprocess
 import time
-import winreg
 from datetime import datetime
 from urllib.parse import quote, unquote
 
@@ -115,11 +114,7 @@ class EPRestApi:
     # wrapper directly returns the relevant object if possible
     def post(self, urlappendix, requestBody=None, message=None):
         """Returns the result object, or the response, if no result object is available."""
-        try:
-            response = self.post_req(urlappendix, requestBody, message)
-        except Exception as e:
-            if "architectures" in urlappendix: self.print_messages()
-            raise e
+        response = self.post_req(urlappendix, requestBody, message)
         return self._extract_result(response)
     
     # wrapper directly returns the relevant object if possible
@@ -191,10 +186,15 @@ class EPRestApi:
         self._precheck_post(urlappendix)
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
         if message: print(message)
-        if requestBody == None:
-            response = requests.post(self._url(url), headers=HEADERS)
-        else:
-            response = requests.post(self._url(url), json=requestBody, headers=HEADERS)
+        try:
+            if requestBody == None:
+                response = requests.post(self._url(url), headers=HEADERS)
+            else:
+                response = requests.post(self._url(url), json=requestBody, headers=HEADERS)
+        except Exception as e:
+            if "architectures" in urlappendix: self.print_messages()
+            print("\n")
+            raise e
         return self._check_long_running(response)
 
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
@@ -336,6 +336,7 @@ class EPRestApi:
 
 
     def _is_rest_addon_installed(self, version):
+        import winreg
         keys = [ 'REST_Server_EU', 'REST_Server_BASE_EU', 'REST_Server_JP' ]
         for key in keys:
             try:
