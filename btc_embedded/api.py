@@ -2,7 +2,9 @@ import os
 import platform
 import subprocess
 import time
+import winreg
 from datetime import datetime
+from urllib.parse import quote, unquote
 
 import requests
 
@@ -13,7 +15,7 @@ DATE_FORMAT = '%d-%b-%Y %H:%M:%S'
 
 class EPRestApi:
     #Starter for the EP executable
-    def __init__(self, host='http://localhost', port=1337, version=None, install_root=None, install_location=None, lic='', config=None, license_location=None):
+    def __init__(self, host='http://localhost', port=1337, version=None, install_root=None, install_location=None, lic='', config=None, license_location=None, timeout=120):
         """
         Wrapper for the BTC EmbeddedPlatform REST API
         - when created without arguments, it uses the default install 
@@ -33,6 +35,8 @@ class EPRestApi:
         self.actively_started = False
         # use default config, if no config was specified
         if not config: config = get_global_config()
+        # apply timeout from config if specified
+        if 'startupTimeout' in config: timeout = config['startupTimeout']
         # set install location based on install_root and version if set explicitly
         if version and install_root: install_location = f"{install_root}/ep{version}"
         # fallback: determine based on config
@@ -46,12 +50,20 @@ class EPRestApi:
                 if not (version and install_location): raise Exception("Cannot start BTC EmbeddedPlatform. Arguments version and install_location or install_root directory must be specified or configured in a config file (installationRoot)")
                 # all good -> prepare start command for BTC EmbeddedPlatform
                 appdata_location = os.environ['APPDATA'].replace('\\', '/') + f"/BTC/ep/{version}/"
-                print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
                 ml_port = 29300 + (port % 100)
                 if ml_port == port:
                     ml_port -= 100
-                if not os.path.isfile(f'"{install_location}/rcp/ep.exe"'):
-                    raise Exception(f'BTC EmbeddedPlatform Executable (ep.exe) could not be found at the expected location ("{install_location}/rcp/ep.exe"). Please provide the correct version and installation root path, either using the version and install_root parameters of the EPRestApi constructor or via the properties epVersion and installationRoot in the config file. The installation root directory is expected to contain the sub directory ep{version}.')
+                if not os.path.isfile(f"{install_location}/rcp/ep.exe"):
+                    print(f'''\n\nBTC EmbeddedPlatform Executable (ep.exe) could not be found at the expected location ("{install_location}/rcp/ep.exe").
+- Please provide the correct version and installation root path:
+   -> either using the version and install_root parameters of the EPRestApi constructor
+   -> or via the properties epVersion and installationRoot in the config file
+- The installation root directory is expected to contain the sub directory ep{version}.\n\n''')
+                    raise Exception("EP Executable not found, cannot start BTC EmbeddedPlatform.")
+                if not self._is_rest_addon_installed(version):
+                    print(f'''\n\nThe REST API AddOn is not installed for BTC EmbeddedPlatform {version}\n\n''')
+                    raise Exception("Addon not installed.")
+                print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
                 args = f'"{install_location}/rcp/ep.exe"' + \
                     ' -clearPersistedState' + \
                     ' -application' + ' ' + headless_application_id + \
@@ -73,8 +85,12 @@ class EPRestApi:
             print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{port}')
             self._apply_preferences(config)
             return
+        start_time = time.time()
         print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{port}')
         while not self._is_rest_service_available():
+            if (time.time() - start_time) > timeout:
+                print(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
+                raise Exception("Application didn't respond within the defined timeout.")
             time.sleep(2)
             print('.', end='')
         print('\nBTC EmbeddedPlatform has started.')
@@ -158,19 +174,15 @@ class EPRestApi:
     # Performs a get request on the given url extension
     def get_req(self, urlappendix, message=None):
         """Public access to this method is DEPRICATED. Use get() instead, unless you want to get the raw http response"""
-        self._precheck_get(urlappendix, message)
-        response = requests.get(self._url(urlappendix.replace('\\', '/').replace(' ', '%20')))
-        if not response.ok:
-            raise Exception(f"Error during request GET {urlappendix}: {response.status_code}: {response.content}")
+        url = self._precheck_get(urlappendix, message)
+        response = requests.get(self._url(url))
         return self._check_long_running(response)
     
     # Performs a delete request on the given url extension
     def delete_req(self, urlappendix, message=None):
         """Public access to this method is DEPRICATED. Use delete() instead, unless you want to get the raw http response"""
         if message: print(message)
-        response = requests.delete(self._url(urlappendix.replace('\\', '/').replace(' ', '%20')), headers=HEADERS)
-        if not response.ok:
-            raise Exception(f"Error during request DELETE {urlappendix}: {response.status_code}: {response.content}")
+        response = requests.delete(self._url(urlappendix), headers=HEADERS)
         return self._check_long_running(response)
 
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
@@ -183,8 +195,6 @@ class EPRestApi:
             response = requests.post(self._url(url), headers=HEADERS)
         else:
             response = requests.post(self._url(url), json=requestBody, headers=HEADERS)
-        if not response.ok:
-            raise Exception(f"Error during request POST {url}: {response.status_code}: {response.content}")
         return self._check_long_running(response)
 
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
@@ -196,8 +206,6 @@ class EPRestApi:
             response = requests.put(self._url(url), headers=HEADERS)
         else:
             response = requests.put(self._url(url), json=requestBody, headers=HEADERS)
-        if not response.ok:
-            raise Exception(f"Error during request PUT {url}: {response}")
         return self._check_long_running(response)
 
 
@@ -233,6 +241,9 @@ class EPRestApi:
 
     # This method is used to poll a request until the progress is done.
     def _check_long_running(self, response):
+        if not response.ok:
+            print(f"\n\nError: {response.content.decode('utf-8')}\n\n")
+            raise Exception(f"Received unsuccessful response from EP.")
         if response.status_code == 202:
             jsonResponse = response.json()
             for key, value in jsonResponse.items():
@@ -302,11 +313,40 @@ class EPRestApi:
         if urlappendix == 'profiles': self.message_marker_date = self.post('message-markers')['date']
             
     def _precheck_get(self, urlappendix, message):
-        if urlappendix[:9] == 'profiles/':
-            self.message_marker_date = self.post('message-markers')['date']
         if not 'progress' in urlappendix:
             # print this unless it's a progress query (to avoid flooding the console)
             if message: print(message)
+        url_combined = urlappendix
+        if urlappendix[:9] == 'profiles/':
+            # set/reset message marker
+            self.message_marker_date = self.post('message-markers')['date']
+            # ensure profile is available and path is url-safe
+            index_qmark = urlappendix.find('?')
+            path = urlappendix[9:index_qmark] if index_qmark else urlappendix[9:]
+            suffix = urlappendix[index_qmark:] if index_qmark else ""
+            path = unquote(path) # unquote incase caller already quoted the path
+            if not os.path.isfile(path):
+                print(f"\nThe profile '{path}' cannot be found. Please ensure that the file is available.\n")
+                exit(1)
+            path = quote(path, safe="")
+            url_combined = 'profiles/' + path + suffix
+        
+        return url_combined
+
+
+
+    def _is_rest_addon_installed(self, version):
+        keys = [ 'REST_Server_EU', 'REST_Server_BASE_EU', 'REST_Server_JP' ]
+        for key in keys:
+            try:
+                # Attempt to open the registry key
+                reg_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, rf'SOFTWARE\BTC\EmbeddedPlatform {version}\Addons\{key}')
+                winreg.CloseKey(reg_key)
+                return True
+            except OSError:
+                continue
+        return False
+
 
 # if called directly, starts EP based on the global config
 if __name__ == '__main__':
