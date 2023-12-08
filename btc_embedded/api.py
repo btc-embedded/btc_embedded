@@ -50,6 +50,8 @@ class EPRestApi:
                 ml_port = 29300 + (port % 100)
                 if ml_port == port:
                     ml_port -= 100
+                if not os.path.isfile(f'"{install_location}/rcp/ep.exe"'):
+                    raise Exception(f'BTC EmbeddedPlatform Executable (ep.exe) could not be found at the expected location ("{install_location}/rcp/ep.exe"). Please provide the correct version and installation root path, either using the version and install_root parameters of the EPRestApi constructor or via the properties epVersion and installationRoot in the config file. The installation root directory is expected to contain the sub directory ep{version}.')
                 args = f'"{install_location}/rcp/ep.exe"' + \
                     ' -clearPersistedState' + \
                     ' -application' + ' ' + headless_application_id + \
@@ -97,13 +99,21 @@ class EPRestApi:
     # wrapper directly returns the relevant object if possible
     def post(self, urlappendix, requestBody=None, message=None):
         """Returns the result object, or the response, if no result object is available."""
-        response = self.post_req(urlappendix, requestBody, message)
+        try:
+            response = self.post_req(urlappendix, requestBody, message)
+        except Exception as e:
+            if "architectures" in urlappendix: self.print_messages()
+            raise e
         return self._extract_result(response)
     
     # wrapper directly returns the relevant object if possible
     def put(self, urlappendix, requestBody=None, message=None):
         """Returns the result object, or the response, if no result object is available."""
-        response = self.put_req(urlappendix, requestBody, message)
+        try:
+            response = self.put_req(urlappendix, requestBody, message)
+        except Exception as e:
+            if "architectures" in urlappendix: self.print_messages()
+            raise e
         return self._extract_result(response)
 
     # wrapper directly returns the relevant object if possible
