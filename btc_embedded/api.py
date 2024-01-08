@@ -77,7 +77,7 @@ class EPRestApi:
                     ' -Dep.licensing.package=' + lic + \
                     ' -Dep.rest.port=' + self._PORT_
                 if license_location or config and 'licenseLocation' in config:
-                    args += f"-Dep.licensing.location={(license_location or config['licenseLocation'])}"
+                    args += f" -Dep.licensing.location={(license_location or config['licenseLocation'])}"
                 subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
                 self.actively_started = True
         else:
