@@ -124,6 +124,7 @@ class EPRestApi:
             response = self.put_req(urlappendix, requestBody, message)
         except Exception as e:
             if "architectures" in urlappendix: self.print_messages()
+            print("\n")
             raise e
         return self._extract_result(response)
 
@@ -242,8 +243,11 @@ class EPRestApi:
     # This method is used to poll a request until the progress is done.
     def _check_long_running(self, response):
         if not response.ok:
-            print(f"\n\nError: {response.content.decode('utf-8')}\n\n")
-            raise Exception(f"Received unsuccessful response from EP.")
+            response_content = response.content.decode('utf-8')
+            # if more of these whitelisted errors show up: optimize approach
+            if not 'The compiler is already defined' in response_content:
+                print(f"\n\nError: {response_content}\n\n")
+                raise Exception(f"Received unsuccessful response from EP.")
         if response.status_code == 202:
             jsonResponse = response.json()
             for key, value in jsonResponse.items():
