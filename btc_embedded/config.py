@@ -65,44 +65,13 @@ def get_merged_config(project_directory=os.getcwd(), silent=False, project_confi
 
 
 def get_vector_gen_config(scope_uid, config=None):
-    """Returns the vector generation payload object for the specified uid and config object.
-    If no config object is specified, the global config is used.
-    - All relevant properties of the config are applied.
-    - Anything not specified in the config is left empty (the API uses default value in those cases)"""
-    vector_generation_config = { 'scopeUid' : scope_uid }
-    if not config:
-        config = get_global_config()
-    # engine settings
-    engine_settings = {}
-    if 'globalTimeout' in config: engine_settings['timeoutSeconds'] = config['globalTimeout']
-    if 'threshold' in config: engine_settings['handlingRateThreshold'] = config['threshold']
-    
-    if 'engines' in config and 'CV' in config['engines']:
-        # prepare cv engine
-        cv_settings = { 'name' : 'CV' }
-        if 'cvTimeoutSeconds' in config: cv_settings['timeoutSecondsPerSubsystem'] = config['cvTimeoutSeconds']
-        if 'cvPropertyTimeoutSeconds' in config: cv_settings['timeoutSecondsPerProperty'] = config['cvPropertyTimeoutSeconds']
-        if 'cvSearchDepth' in config: cv_settings['searchDepthSteps'] = config['cvSearchDepth']
-        if 'loopUnrollLimit' in config: cv_settings['loopUnroll'] = config['loopUnrollLimit']
-        if 'maximumNumberOfThreads' in config: cv_settings['maximumNumberOfThreads'] = config['maximumNumberOfThreads']
-        if 'parallelExecutionMode' in config: cv_settings['parallelExecutionMode'] = config['parallelExecutionMode']
-        if 'modelCheckers' in config:
-            cv_settings['coreEngines'] = []
-            [cv_settings['coreEngines'].append({ 'name' : model_checker }) for model_checker in config['modelCheckers']]
-        # add cv engine to engine settings
-        engine_settings['engineCv'] = cv_settings
-
-    if 'engines' in config and 'ATG' in config['engines']:
-        # prepare cv engine
-        atg_settings = { 'name' : 'ATG' }
-        if 'atgTimeoutSeconds' in config: atg_settings['timeoutSecondsPerSubsystem'] = config['atgTimeoutSeconds']
-        # add cv engine to engine settings
-        engine_settings['engineAtg'] = atg_settings
-
-    vector_generation_config['engineSettings'] = engine_settings
-    # pll
-    if 'pllString' in config: vector_generation_config['pllString'] = config['pllString']
-    return vector_generation_config
+    """@DEPRICATED
+    Vector generation settings can be specified using the respective preferences.
+    Consult the BTC EmbeddedPlatform Preference Configuration Guide.pdf in the
+    documentation folder of the BTC EmbeddedPlatform installation for a comprehensive
+    list and description of available preferences and their effects.
+    """
+    return { 'scopeUid' : scope_uid }
 
 def __load_config(config_file):
     """Attemps to load a config from the specified yaml file.
