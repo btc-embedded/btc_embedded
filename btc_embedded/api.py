@@ -188,7 +188,10 @@ class EPRestApi:
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
         if message: print(message)
         try:
-            if requestBody == None:
+            if self._is_exit_request(urlappendix, requestBody):
+                try: requests.post(self._url(url), json=requestBody, headers=HEADERS, timeout=(3,1))
+                except: pass
+            elif requestBody == None:
                 response = requests.post(self._url(url), headers=HEADERS)
             else:
                 response = requests.post(self._url(url), json=requestBody, headers=HEADERS)
@@ -196,6 +199,7 @@ class EPRestApi:
             if "architectures" in urlappendix: self.print_messages()
             print("\n")
             raise e
+        if self._is_exit_request(urlappendix, requestBody): return None
         return self._check_long_running(response)
 
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
@@ -337,7 +341,11 @@ class EPRestApi:
         
         return url_combined
 
-
+    def _is_exit_request(self, urlappendix, requestBody):
+        try:
+            return ('execute-long-matlab-script' in urlappendix or 'execute-short-matlab-script' in urlappendix) and requestBody['scriptName'] == 'exit'
+        except:
+            return False
 
     def _is_rest_addon_installed(self, version):
         import winreg
