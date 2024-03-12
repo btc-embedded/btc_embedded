@@ -328,7 +328,7 @@ class EPRestApi:
         except:
             version = '23.3p0'
         headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
-
+        matlab_ip = os.environ['MATLAB_IP'] if 'MATLAB_IP' in os.environ else '127.0.0.1'
         print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
 
         args = [ os.environ['EP_INSTALL_PATH'] + '/ep',
@@ -343,9 +343,11 @@ class EPRestApi:
             '-Dep.licensing.location=' + os.environ['LICENSE_LOCATION'],
             '-Dep.licensing.package=' + os.environ['LICENSE_PACKAGES'],
             '-Drest.port=' + os.environ['REST_PORT'],
+            '-Dosgi.configuration.area.default=/tmp/ep/configuration',
+            '-Dosgi.instance.area.default=/tmp/ep/workspace',
             '-Dep.runtime.batch=ep',
             '-Dep.runtime.api.port=1109',
-            '-Dep.matlab.ip.range=127.0.0.1' ]
+            '-Dep.matlab.ip.range=' + matlab_ip ]
         
         # start ep process
         subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
