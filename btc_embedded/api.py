@@ -1,5 +1,7 @@
 import os
 import platform
+import re
+import shutil
 import subprocess
 import time
 from datetime import datetime
@@ -28,7 +30,7 @@ class EPRestApi:
            'docker run -p 1337:8080 -v "/my/workdir:/my/workdir" btces/ep'
         to run the BTC EmbeddedPlatform docker image.
         """
-        self._PORT_ = str(port)
+        self._PORT_ = "8080" if platform.system() == 'Linux' else str(port)
         self._HOST_ = host
         self.definitively_closed = False
         self.actively_started = False
@@ -43,49 +45,14 @@ class EPRestApi:
             version = config['epVersion']
             install_location = f"{config['installationRoot']}/ep{config['epVersion']}"
         if not self._is_rest_service_available():
-            if platform.system() == 'Windows':
-                headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
-                # check if we have what we need
-                if not (version and install_location): raise Exception("Cannot start BTC EmbeddedPlatform. Arguments version and install_location or install_root directory must be specified or configured in a config file (installationRoot)")
-                # all good -> prepare start command for BTC EmbeddedPlatform
-                appdata_location = os.environ['APPDATA'].replace('\\', '/') + f"/BTC/ep/{version}/"
-                ml_port = 29300 + (port % 100)
-                if ml_port == port:
-                    ml_port -= 100
-                if not os.path.isfile(f"{install_location}/rcp/ep.exe"):
-                    print(f'''\n\nBTC EmbeddedPlatform Executable (ep.exe) could not be found at the expected location ("{install_location}/rcp/ep.exe").
-- Please provide the correct version and installation root path:
-   -> either using the version and install_root parameters of the EPRestApi constructor
-   -> or via the properties epVersion and installationRoot in the config file
-- The installation root directory is expected to contain the sub directory ep{version}.\n\n''')
-                    raise Exception("EP Executable not found, cannot start BTC EmbeddedPlatform.")
-                if not self._is_rest_addon_installed(version):
-                    print(f'''\n\nThe REST API AddOn is not installed for BTC EmbeddedPlatform {version}\n\n''')
-                    raise Exception("Addon not installed.")
-                print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
-                args = f'"{install_location}/rcp/ep.exe"' + \
-                    ' -clearPersistedState' + \
-                    ' -application' + ' ' + headless_application_id + \
-                    ' -nosplash' + \
-                    ' -vmargs' + \
-                    ' -Dep.runtime.batch=ep' + \
-                    ' -Dep.runtime.api.port=' + str(ml_port) + \
-                    ' -Dosgi.configuration.area.default="' + appdata_location + self._PORT_ + '/configuration"' + \
-                    ' -Dosgi.instance.area.default="' + appdata_location + self._PORT_ + '/workspace"' + \
-                    ' -Dep.configuration.logpath=AppData/Roaming/BTC/ep/' + version + '/' + self._PORT_ + '/logs' + \
-                    ' -Dep.runtime.workdir=BTC/ep/' + version + '/' + self._PORT_ + \
-                    ' -Dep.licensing.package=' + lic + \
-                    ' -Dep.rest.port=' + self._PORT_
-                if license_location or config and 'licenseLocation' in config:
-                    args += f" -Dep.licensing.location={(license_location or config['licenseLocation'])}"
-                subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-                self.actively_started = True
+            if platform.system() == 'Windows': self._start_app_windows(version, install_location, self._PORT_, license_location, lic, config)
+            elif platform.system() == 'Linux': self._start_app_linux()
         else:
-            print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{port}')
+            print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
             self._apply_preferences(config)
             return
         start_time = time.time()
-        print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{port}')
+        print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
         while not self._is_rest_service_available():
             if (time.time() - start_time) > timeout:
                 print(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
@@ -348,6 +315,84 @@ class EPRestApi:
             except OSError:
                 continue
         return False
+
+    # start commands depending on OS
+
+    def _start_app_linux(self):
+        # container use case -> start EP and Matlab
+        headless_application_id = 'ep.application.headless.HeadlessApplication'
+        try:
+            ep_ini_path = os.path.join(os.environ['EP_INSTALL_PATH'], 'ep.ini')
+            with open(ep_ini_path, 'r') as file:
+                content = file.read()
+            version = re.search(r'/ep/(\d+\.\d+[a-zA-Z]*\d+)/', content).group(1)
+            if version < '23.3p0': headless_application_id = 'ep.application.headless' 
+        except:
+            pass
+
+        print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
+        
+        args = [ os.environ['EP_INSTALL_PATH'] + '/ep',
+            '-clearPersistedState', '-nosplash', '-console', '-consoleLog',
+            '-application', headless_application_id,            
+            '-vmargs',
+            '-Dep.linux.config=' + os.environ['EP_REGISTRY'],
+            '-Dlogback.configurationFile=' + os.environ['EP_LOG_CONFIG'],
+            '-Dep.configuration.logpath=' + os.environ['LOG_DIR'],
+            '-Dep.runtime.workdir=' + os.environ['WORK_DIR'],
+            '-Dbtc.root.temp.dir=' + os.environ['TMP_DIR'],
+            '-Dep.licensing.location=' + os.environ['LICENSE_LOCATION'],
+            '-Dep.licensing.package=' + os.environ['LICENSE_PACKAGES'],
+            '-Drest.port=' + os.environ['REST_PORT'],
+            '-Dep.runtime.batch=ep',
+            '-Dep.runtime.api.port=1109',
+            '-Dep.matlab.ip.range=127.0.0.1' ]
+        
+        # start ep process
+        subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.actively_started = True
+        
+        # if container has matlab -> assume that this shall be started as well
+        if shutil.which('matlab'): subprocess.Popen('matlab')
+
+
+    def _start_app_windows(self, version, install_location, port, license_location, lic, config):
+        headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
+        # check if we have what we need
+        if not (version and install_location): raise Exception("Cannot start BTC EmbeddedPlatform. Arguments version and install_location or install_root directory must be specified or configured in a config file (installationRoot)")
+        # all good -> prepare start command for BTC EmbeddedPlatform
+        appdata_location = os.environ['APPDATA'].replace('\\', '/') + f"/BTC/ep/{version}/"
+        ml_port = 29300 + (port % 100)
+        if ml_port == port:
+            ml_port -= 100
+        if not os.path.isfile(f"{install_location}/rcp/ep.exe"):
+            print(f'''\n\nBTC EmbeddedPlatform Executable (ep.exe) could not be found at the expected location ("{install_location}/rcp/ep.exe").
+- Please provide the correct version and installation root path:
+-> either using the version and install_root parameters of the EPRestApi constructor
+-> or via the properties epVersion and installationRoot in the config file
+- The installation root directory is expected to contain the sub directory ep{version}.\n\n''')
+            raise Exception("EP Executable not found, cannot start BTC EmbeddedPlatform.")
+        if not self._is_rest_addon_installed(version):
+            print(f'''\n\nThe REST API AddOn is not installed for BTC EmbeddedPlatform {version}\n\n''')
+            raise Exception("Addon not installed.")
+        print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
+        args = f'"{install_location}/rcp/ep.exe"' + \
+            ' -clearPersistedState' + \
+            ' -application' + ' ' + headless_application_id + \
+            ' -nosplash' + \
+            ' -vmargs' + \
+            ' -Dep.runtime.batch=ep' + \
+            ' -Dep.runtime.api.port=' + str(ml_port) + \
+            ' -Dosgi.configuration.area.default="' + appdata_location + self._PORT_ + '/configuration"' + \
+            ' -Dosgi.instance.area.default="' + appdata_location + self._PORT_ + '/workspace"' + \
+            ' -Dep.configuration.logpath=AppData/Roaming/BTC/ep/' + version + '/' + self._PORT_ + '/logs' + \
+            ' -Dep.runtime.workdir=BTC/ep/' + version + '/' + self._PORT_ + \
+            ' -Dep.licensing.package=' + lic + \
+            ' -Dep.rest.port=' + self._PORT_
+        if license_location or config and 'licenseLocation' in config:
+                f" -Dep.licensing.location={(license_location or config['licenseLocation'])}"
+        subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+        self.actively_started = True
 
 
 # if called directly, starts EP based on the global config
