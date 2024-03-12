@@ -320,18 +320,17 @@ class EPRestApi:
 
     def _start_app_linux(self):
         # container use case -> start EP and Matlab
-        headless_application_id = 'ep.application.headless.HeadlessApplication'
         try:
             ep_ini_path = os.path.join(os.environ['EP_INSTALL_PATH'], 'ep.ini')
             with open(ep_ini_path, 'r') as file:
                 content = file.read()
             version = re.search(r'/ep/(\d+\.\d+[a-zA-Z]*\d+)/', content).group(1)
-            if version < '23.3p0': headless_application_id = 'ep.application.headless' 
         except:
-            pass
+            version = '23.3p0'
+        headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
 
         print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
-        
+
         args = [ os.environ['EP_INSTALL_PATH'] + '/ep',
             '-clearPersistedState', '-nosplash', '-console', '-consoleLog',
             '-application', headless_application_id,            
