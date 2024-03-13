@@ -45,7 +45,7 @@ class EPRestApi:
             version = config['epVersion']
             install_location = f"{config['installationRoot']}/ep{config['epVersion']}"
         if not self._is_rest_service_available():
-            if platform.system() == 'Windows': self._start_app_windows(version, install_location, self._PORT_, license_location, lic, config)
+            if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, config)
             elif platform.system() == 'Linux': self._start_app_linux()
         else:
             print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
