@@ -292,8 +292,8 @@ class EPRestApi:
             self.message_marker_date = self.post('message-markers')['date']
             # ensure profile is available and path is url-safe
             index_qmark = urlappendix.find('?')
-            path = urlappendix[9:index_qmark] if index_qmark else urlappendix[9:]
-            suffix = urlappendix[index_qmark:] if index_qmark else ""
+            path = urlappendix[9:index_qmark] if index_qmark > 0 else urlappendix[9:]
+            suffix = urlappendix[index_qmark:] if index_qmark > 0 else ""
             path = unquote(path) # unquote incase caller already quoted the path
             if not os.path.isfile(path):
                 print(f"\nThe profile '{path}' cannot be found. Please ensure that the file is available.\n")
