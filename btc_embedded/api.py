@@ -101,8 +101,7 @@ class EPRestApi:
 
     # closes the application
     def close_application(self):
-        print('Exiting EP... please wait while we save your data.')
-        self.delete('/application')
+        self.delete('application?force-quit=true')
         self.definitively_closed = True
 
     # wrapper directly returns the relevant object if possible
