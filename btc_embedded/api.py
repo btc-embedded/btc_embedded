@@ -57,9 +57,6 @@ class EPRestApi:
             if (time.time() - start_time) > timeout:
                 print(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
                 raise Exception("Application didn't respond within the defined timeout.")
-            elif (self.ep_process.poll() is None):
-                print(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")
-                raise Exception("Application failed to start.")
             time.sleep(2)
             print('.', end='')
         print('\nBTC EmbeddedPlatform has started.')
@@ -331,7 +328,7 @@ class EPRestApi:
                 content = file.read()
             version = re.search(r'/ep/(\d+\.\d+[a-zA-Z]*\d+)/', content).group(1)
         except:
-            version = '24.1p0'
+            version = '23.3p0'
         headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
         matlab_ip = os.environ['MATLAB_IP'] if 'MATLAB_IP' in os.environ else '127.0.0.1'
         print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
@@ -355,8 +352,7 @@ class EPRestApi:
             '-Dep.matlab.ip.range=' + matlab_ip ]
         
         # start ep process
-        self.ep_process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        self.log_file_path = os.environ['LOG_DIR'] + '/current.log'
+        subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.actively_started = True
         
         # if container has matlab -> assume that this shall be started as well
@@ -398,8 +394,7 @@ class EPRestApi:
             ' -Dep.rest.port=' + self._PORT_
         if license_location or config and 'licenseLocation' in config:
                 f" -Dep.licensing.location={(license_location or config['licenseLocation'])}"
-        self.ep_process = subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-        self.log_file_path = appdata_location + self._PORT_ + '/logs/current.log'
+        subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
         self.actively_started = True
 
 
