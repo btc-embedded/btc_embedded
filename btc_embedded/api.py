@@ -128,6 +128,7 @@ class EPRestApi:
         messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT))
         for msg in messages:
             print(f"[{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
+        print("\n")
 
     # - - - - - - - - - - - - - - - - - - - - 
     #   DEPRICATED PUBLIC FUNCTIONS
@@ -213,6 +214,7 @@ class EPRestApi:
             # if more of these whitelisted errors show up: optimize approach
             if not 'The compiler is already defined' in response_content:
                 print(f"\n\nError: {response_content}\n\n")
+                self.print_messages()
                 raise Exception(f"Received unsuccessful response from EP.")
         if response.status_code == 202:
             jsonResponse = response.json()
