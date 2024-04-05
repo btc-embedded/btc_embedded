@@ -57,7 +57,7 @@ class EPRestApi:
             if (time.time() - start_time) > timeout:
                 print(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
                 raise Exception("Application didn't respond within the defined timeout.")
-            elif (self.ep_process.poll() is None):
+            elif (not self._is_ep_process_still_alive()):
                 print(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")
                 raise Exception("Application failed to start.")
             time.sleep(2)
@@ -402,6 +402,8 @@ class EPRestApi:
         self.log_file_path = appdata_location + self._PORT_ + '/logs/current.log'
         self.actively_started = True
 
+    def _is_ep_process_still_alive(self):
+        return self.ep_process.poll() is None
 
 # if called directly, starts EP based on the global config
 if __name__ == '__main__':
