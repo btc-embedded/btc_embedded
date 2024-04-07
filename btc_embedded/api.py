@@ -124,14 +124,15 @@ class EPRestApi:
         
         - severity: INFO, WARNING, ERROR or CRITICAL
         - search_string: only prints messages that contain the given string"""
-        path = f"/message-markers/{self.message_marker_date}/messages"
-        if search_string: path += '?search-string=' + search_string
-        if severity: path += ('&' if search_string else '?') + f"severity={severity}"
-        messages = self.get(path)
-        messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT))
-        for msg in messages:
-            print(f"[{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
-        print("\n")
+        if self.message_marker_date:
+            path = f"/message-markers/{self.message_marker_date}/messages"
+            if search_string: path += '?search-string=' + search_string
+            if severity: path += ('&' if search_string else '?') + f"severity={severity}"
+            messages = self.get(path)
+            messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT))
+            for msg in messages:
+                print(f"[{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
+            print("\n")
 
     # - - - - - - - - - - - - - - - - - - - - 
     #   DEPRICATED PUBLIC FUNCTIONS
