@@ -16,7 +16,7 @@ DATE_FORMAT = '%d-%b-%Y %H:%M:%S'
 
 class EPRestApi:
     #Starter for the EP executable
-    def __init__(self, host='http://localhost', port=1337, version=None, install_root=None, install_location=None, lic='', config=None, license_location=None, timeout=120):
+    def __init__(self, host='http://localhost', port=1337, version=None, install_root=None, install_location=None, lic='', config=None, license_location=None, timeout=120, skip_matlab_start=False):
         """
         Wrapper for the BTC EmbeddedPlatform REST API
         - when created without arguments, it uses the default install 
@@ -46,7 +46,7 @@ class EPRestApi:
             install_location = f"{config['installationRoot']}/ep{config['epVersion']}"
         if not self._is_rest_service_available():
             if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, config)
-            elif platform.system() == 'Linux': self._start_app_linux()
+            elif platform.system() == 'Linux': self._start_app_linux(skip_matlab_start)
         else:
             print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
             self._apply_preferences(config)
@@ -324,7 +324,7 @@ class EPRestApi:
 
     # start commands depending on OS
 
-    def _start_app_linux(self):
+    def _start_app_linux(self, skip_matlab_start):
         # container use case -> start EP and Matlab
         try:
             ep_ini_path = os.path.join(os.environ['EP_INSTALL_PATH'], 'ep.ini')
@@ -361,7 +361,7 @@ class EPRestApi:
         self.actively_started = True
         
         # if container has matlab -> assume that this shall be started as well
-        if shutil.which('matlab'): subprocess.Popen('matlab')
+        if shutil.which('matlab') and not skip_matlab_start: subprocess.Popen('matlab')
 
 
     def _start_app_windows(self, version, install_location, port, license_location, lic, config):
