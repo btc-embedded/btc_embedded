@@ -1,5 +1,6 @@
 import os
 import platform
+import pty
 import re
 import shutil
 import subprocess
@@ -53,7 +54,6 @@ class EPRestApi:
             return
         start_time = time.time()
         print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
-        self.check_for_ep_start_keyword(start_time, timeout)
         while not self._is_rest_service_available():
             if (time.time() - start_time) > timeout:
                 print(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
@@ -362,22 +362,9 @@ class EPRestApi:
         self.actively_started = True
         
         # if container has matlab -> assume that this shall be started as well
-        if shutil.which('matlab') and not skip_matlab_start: subprocess.Popen('matlab')
-
-    def check_for_ep_start_keyword(self, start_time, timeout):
-        return
-        while True:
-            if (time.time() - start_time) > timeout:
-                print(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
-                raise Exception("Application didn't respond within the defined timeout.")
-            elif (not self._is_ep_process_still_alive()):
-                print(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")
-                raise Exception("Application failed to start.")
-        
-            # check application output
-            output = self.ep_process.stdout.readline()
-            if '= REST Server started =' in output: return
-            
+        if shutil.which('matlab') and not skip_matlab_start:
+            _, secondary_pty = pty.openpty()
+            subprocess.Popen('matlab', stdin=secondary_pty)
 
     def _start_app_windows(self, version, install_location, port, license_location, lic, config):
         headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
