@@ -286,14 +286,14 @@ class EPRestApi:
     
     def _precheck_post(self, urlappendix):
         # create message marker 
-        if urlappendix == 'profiles': self.message_marker_date = self.post('message-markers')['date']
+        if urlappendix[:8] == 'profiles': self.message_marker_date = self.post('message-markers')['date']
             
     def _precheck_get(self, urlappendix, message):
         if not 'progress' in urlappendix:
             # print this unless it's a progress query (to avoid flooding the console)
             if message: print(message)
         url_combined = urlappendix
-        if urlappendix[:9] == 'profiles/':
+        if urlappendix[:8] == 'profiles':
             # set/reset message marker
             self.message_marker_date = self.post('message-markers')['date']
             # ensure profile is available and path is url-safe
@@ -400,7 +400,7 @@ class EPRestApi:
             ' -Dep.licensing.package=' + lic + \
             ' -Dep.rest.port=' + self._PORT_
         if license_location or config and 'licenseLocation' in config:
-                f" -Dep.licensing.location={(license_location or config['licenseLocation'])}"
+                args += f" -Dep.licensing.location={(license_location or config['licenseLocation'])}"
         self.ep_process = subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
         self.log_file_path = appdata_location + self._PORT_ + '/logs/current.log'
         self.actively_started = True
