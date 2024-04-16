@@ -1,6 +1,5 @@
 import os
 import platform
-import pty
 import re
 import shutil
 import subprocess
@@ -363,6 +362,7 @@ class EPRestApi:
         
         # if container has matlab -> assume that this shall be started as well
         if shutil.which('matlab') and not skip_matlab_start:
+            import pty
             _, secondary_pty = pty.openpty()
             subprocess.Popen('matlab', stdin=secondary_pty)
 
