@@ -72,6 +72,13 @@ class EPRestApi:
     # closes the application
     def close_application(self):
         self.delete('application?force-quit=true')
+        start_time = time.time()
+        while self._is_rest_service_available():
+            if (time.time() - start_time) > 10:
+                # kill by PID if it didn't close within 10s
+                os.kill(self.ep_process, signal.SIGKILL)
+            else:
+                time.sleep(2)
         self.definitively_closed = True
 
     # wrapper directly returns the relevant object if possible
