@@ -6,7 +6,7 @@ from importlib import resources
 # 
 # ----------------------------- Main-function -----------------------------
 # 
-def create_test_report_summary(results, report_title='BTC Test Report Summary', report_name='BTCTestReportSummary.html'):
+def create_test_report_summary(results, report_title='BTC Test Report Summary', report_name='BTCTestReportSummary.html', target_dir='.'):
     """
     Takes a list of individual results and creates a summary report from it.
     
@@ -47,8 +47,9 @@ def create_test_report_summary(results, report_title='BTC Test Report Summary', 
                               .replace('__projects__', projects_string)
 
     # Write the final HTML file
-    with open(report_name, "w") as f:
-        f.write(final_html)
+    target_file_path = os.path.abspath(os.path.join(target_dir, report_name))
+    with open(target_file_path, "w") as target_file:
+        target_file.write(final_html)
 
 
 #
