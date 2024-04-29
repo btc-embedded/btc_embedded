@@ -19,6 +19,10 @@ def create_test_report_summary(results, report_title='BTC Test Report Summary', 
     - eppPath (path to the *.epp file)
     - reportPath (path to the project's html report)
     """
+    if not results:
+        print("No data provided to 'create_test_report_summary' method.")
+        return
+    
     with resources.path("btc_embedded", "btc_summary_report.template") as template_file:
         BTC_SUMMARY_REPORT_TEMPLATE = str(template_file)
     # aggregate total_duration and overall_status
@@ -66,19 +70,25 @@ def get_project_string(result):
     # - eppPath          : path to project.epp
     # - eppName          : name of the project.epp (incl. extension) -> eppPath basename
     # - duration         : duration in the form hh:mm:ss
-    template = '<tr><td><span class="{statusIconClass}" title="{statusMessage}"> </span></td><td><a href="{reportPath}">{projectName}</a></td><td>{statementCoverage}% Statement, {mcdcCoverage}% MC/DC</td><td><a href="{eppPath}">{eppName}</a></td><td>{duration}</td><td><div class="result_container"><div class="{testResult}"/><b>{testResult}</b></div></td></tr>'
+    template = '<tr><td><span class="{statusIconClass}" title="{statusMessage}"> </span></td><td><a href="{reportPath}">{projectName}</a></td><td>{infoText}</td><td><a href="{eppPath}">{eppName}</a></td><td>{duration}</td><td><div class="result_container"><div class="{testResult}"/><b>{testResult}</b></div></td></tr>'
     # Fill in the HTML template with the data
+    # 
+    if 'statementCoverage' in result and 'mcdcCoverage' in result:
+        info = f'{result["statementCoverage"]:.2f}% Statement, {result["mcdcCoverage"]:.2f}% MC/DC'
+    elif 'errorMessage' in result:
+        info = result['errorMessage']
+    else:
+        info = ''
     project_html_entry = template.format(
         projectName = result["projectName"],
         testResult = result["testResult"],
-        statementCoverage = f'{result["statementCoverage"]:.2f}',
-        mcdcCoverage = f'{result["mcdcCoverage"]:.2f}',
         reportPath = result["reportPath"],
         eppPath = result["eppPath"],
         eppName = os.path.basename(result["eppPath"]),
         duration = seconds_to_hms(result["duration"]),
         statusIconClass = ('icon-sdc' if result["testResult"] == 'PASSED' else 'icon-wdc' if result["testResult"] == 'FAILED' else 'icon-edc'),
-        statusMessage = result["testResult"]
+        statusMessage = result["testResult"],
+        infoText = info
     )
     return project_html_entry
 

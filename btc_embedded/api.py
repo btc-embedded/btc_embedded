@@ -2,6 +2,7 @@ import os
 import platform
 import re
 import shutil
+import signal
 import subprocess
 import time
 from datetime import datetime
@@ -99,7 +100,7 @@ class EPRestApi:
         try:
             response = self.put_req(urlappendix, requestBody, message)
         except Exception as e:
-            if "architectures" in urlappendix: self.print_messages()
+            self.print_messages()
             print("\n")
             raise e
         return self._extract_result(response)
@@ -131,14 +132,14 @@ class EPRestApi:
         
         - severity: INFO, WARNING, ERROR or CRITICAL
         - search_string: only prints messages that contain the given string"""
-        if self.message_marker_date:
+        if hasattr(self, 'message_marker_date') and self.message_marker_date:
             path = f"/message-markers/{self.message_marker_date}/messages"
             if search_string: path += '?search-string=' + search_string
             if severity: path += ('&' if search_string else '?') + f"severity={severity}"
             messages = self.get(path)
             messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT))
             for msg in messages:
-                print(f"[{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
+                print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
             print("\n")
 
     # - - - - - - - - - - - - - - - - - - - - 
@@ -171,7 +172,7 @@ class EPRestApi:
             else:
                 response = requests.post(self._url(url), json=requestBody, headers=HEADERS)
         except Exception as e:
-            if "architectures" in urlappendix: self.print_messages()
+            self.print_messages()
             print("\n")
             raise e
         return self._check_long_running(response)

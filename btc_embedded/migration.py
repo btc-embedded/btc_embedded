@@ -1,14 +1,15 @@
 import glob
 import os
 import shutil
-import traceback
 from datetime import datetime
+from urllib.parse import quote
 
 from btc_embedded.api import EPRestApi
 from btc_embedded.reporting import create_test_report_summary
 
 tmp = {}
 source_version = None
+message_report_file = None
 
 def migration_suite_source(models, matlab_version):
     """For each of the given models this function generates tests for
@@ -17,12 +18,14 @@ def migration_suite_source(models, matlab_version):
     global source_version
     source_version = matlab_version
     shutil.rmtree('results', ignore_errors=True)
+    model_results = {}
     ep = start_ep_and_configure_matlab(matlab_version)
     for old_model in models:
-        migration_source(old_model, matlab_version, ep_api_object=ep)
+        migration_source(old_model, matlab_version, ep_api_object=ep, model_results=model_results)
     ep.close_application()
+    return model_results
 
-def migration_suite_target(models, matlab_version):
+def migration_suite_target(models, matlab_version, model_results=None, accept_interface_changes=False):
     """For each of the given models this function
     imports the reference execution records and simulates the same
     vectors on MIL and SIL based on the specified Matlab version. This
@@ -31,66 +34,48 @@ def migration_suite_target(models, matlab_version):
     results = []
     ep = start_ep_and_configure_matlab(matlab_version)
     for new_model in models:
-        result = migration_target(new_model, matlab_version, ep_api_object=ep)
+        result = migration_target(new_model, matlab_version, ep_api_object=ep, model_results=model_results, accept_interface_changes=accept_interface_changes)
         results.append(result)
     ep.close_application()
     create_test_report_summary(results, 'BTC Migration Test Suite', 'BTCMigrationTestSuite.html', 'results')
+    return model_results
 
-def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=None):
+def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=None, model_results=None):
     """Generates tests for full coverage on the given model using the
     specified Matlab version, then performs a MIL and SIL simulation
     to record the reference behavior.
 
     Returns the BTC EmbeddedPlatform Project (*.epp).
     """
-    # check if the ep api object is controlled externally
-    if ep_api_object: ep = ep_api_object
-    else: ep = start_ep_and_configure_matlab(matlab_version)
-
+    global message_report_file
+    step_results = []
     start_time = datetime.now()
     model_path = os.path.abspath(old_model['model'])
     model_name = os.path.basename(model_path)[:-4].replace('Wrapper_', '')
     script_path = os.path.abspath(old_model['script']) if 'script' in old_model and old_model['script'] else None
     result_dir = os.path.abspath('results')
-    epp_file, _ = get_epp_file_by_name(result_dir, model_path)
+    message_report_file = quote(os.path.join(result_dir, f'{model_name}_messages.html'))
+    epp_file, epp_rel_path = get_epp_file_by_name(result_dir, model_path)
+    
+    # start ep or use provided api object
+    ep, step_result = src_01_start_ep(ep_api_object, matlab_version, step_results)
+    if step_result and step_result['status'] == 'ERROR':
+        return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
     
     # Empty BTC EmbeddedPlatform profile (*.epp) + Arch Import
-    ep.post('profiles?discardCurrentProfile=true')
-
-    # Import model
-    payload = {
-        'ecModelFile' : model_path,
-        'ecInitScript' : script_path
-    } 
-    ep.post('architectures/embedded-coder', payload, message=f"Importing {model_name}  with Matlab R{matlab_version}")
-    scopes = ep.get('scopes')
-    toplevel_scope_uid = next(scope['uid'] for scope in scopes if scope['architecture'] == 'Simulink')
+    toplevel_uid, step_result = src_02_import_model(ep, model_path, script_path, model_name, matlab_version, step_results)
+    if step_result and step_result['status'] == 'ERROR':
+        return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
 
     # Generate vectors for full coverage
-    ep.post('coverage-generation', { 'scopeUid' : toplevel_scope_uid, 'pllString': 'MCDC' }, message="Generating vectors")
-    b2b_coverage = ep.get(f"scopes/{toplevel_scope_uid}/coverage-results-b2b")
-    print('Coverage ' + "{:.2f}%".format(b2b_coverage['MCDCPropertyCoverage']['handledPercentage']))
+    step_result = src_03_generate_vectors(ep, toplevel_uid, step_results)
+    if step_result and step_result['status'] == 'ERROR':
+        return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
 
     # Simulation
-    payload = { 'execConfigNames' : ['SL MIL', 'SIL'] if test_mil else ['SIL'] }
-    ep.post(f"scopes/{toplevel_scope_uid}/testcase-simulation", payload, message="Reference Simulation on MIL and SIL")
-
-    # Store MIL and SIL executions for comparison
-    all_execution_records = ep.get('execution-records')
-    payload = { "folderKind": "EXECUTION_RECORD" }
-    
-    # SIL
-    payload['folderName'] = 'old-sil'
-    old_sil_folder = ep.post('folders', payload)
-    sil_execution_records_uids = [ er['uid'] for er in all_execution_records if er['executionConfig'] == 'SIL']
-    ep.put(f"folders/{old_sil_folder['uid']}/execution-records", { 'UIDs' : sil_execution_records_uids })
-    
-    # MIL
-    if test_mil:
-        payload['folderName'] = 'old-mil'
-        old_mil_folder = ep.post('folders', payload)
-        mil_execution_records_uids = [ er['uid'] for er in all_execution_records if er['executionConfig'] == 'SL MIL']
-        ep.put(f"folders/{old_mil_folder['uid']}/execution-records", { 'UIDs' : mil_execution_records_uids })
+    step_result = src_04_reference_simulation(ep, toplevel_uid, test_mil, step_results)
+    if step_result and step_result['status'] == 'ERROR':
+        return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
 
     # Save *.epp, close application unless controlled externally
     ep.put('profiles', { 'path': epp_file })
@@ -100,10 +85,11 @@ def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=No
     global tmp
     duration_seconds = (datetime.now() - start_time).seconds
     tmp[model_name] = duration_seconds
-    
+    if not model_results == None: model_results[model_name] = step_results
+
     return epp_file
 
-def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=None, epp_file=None):
+def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=None, epp_file=None, accept_interface_changes=False, model_results=None):
     """Imports the reference execution records and simulates the same
     vectors on MIL and SIL based on the specified Matlab version. This
     regression test will show any changed behavior compared to the provided 
@@ -111,104 +97,229 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
 
     Produces a test report
     """
-    # check if the ep api object is controlled externally
-    if ep_api_object: ep = ep_api_object
-    else: ep = start_ep_and_configure_matlab(matlab_version)
-
+    global message_report_file
     start_time = datetime.now()
     model_path = os.path.abspath(new_model['model'])
     model_name = os.path.basename(model_path)[:-4].replace('Wrapper_', '')
     script_path = os.path.abspath(new_model['script']) if 'script' in new_model and new_model['script'] else None
     result_dir = os.path.abspath('results')
+    message_report_file = quote(os.path.join(result_dir, f'{model_name}_messages.html'))
     if epp_file: epp_rel_path = None
     else: epp_file, epp_rel_path = get_epp_file_by_name(result_dir, model_path)
-
-    # load BTC EmbeddedPlatform profile (*.epp) -> Update Model
-    ep.get(f'profiles/{epp_file}?discardCurrentProfile=true')
-
-    # Arch Update
-    payload = {
-        'slModelFile' : model_path,
-        'slInitScript' : script_path
-    } 
-    ep.put(f"architectures/model-paths", payload)
-    ep.put('architectures', message=f"Updating model & generating code for {model_name} with Matlab {matlab_version}")
-
-    scopes = ep.get('scopes')
-    toplevel_scope_uid = next(scope['uid'] for scope in scopes if scope['architecture'] == 'Simulink')
+    step_results = model_results[model_name] if model_results else []
     
-    # Import Execution Records
-    # -> SIL
-    # folder
-    payload = {'folderKind': 'EXECUTION_RECORD', 'folderName' : 'new-sil' }
-    new_sil_folder = ep.post('folders', payload)
-    old_sil_folder = ep.get('folders?name=old-sil')[0]
-    # regression test
-    payload = { 
-        'compMode': 'SIL',
-        'compFolderUID' : new_sil_folder['uid']
-    }
-    sil_test = ep.post(f"folders/{old_sil_folder['uid']}/regression-tests", payload, message="Regression Test SIL vs. SIL")
-    # verdictStatus, failed, error, passed, total
-    print(f"Result: {sil_test['verdictStatus']}")
+    # start ep or use provided api object
+    ep, step_result = src_01_start_ep(ep_api_object, matlab_version, step_results)
+    if step_result and step_result['status'] == 'ERROR':
+        return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
+    
+    # load BTC EmbeddedPlatform profile (*.epp), update architecture and check for interface changes
+    toplevel_uid, step_result = tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, model_name, accept_interface_changes, matlab_version, step_results)
+    if step_result and step_result['status'] == 'ERROR':
+        return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
 
-    # -> MIL
+    # Regression Test (SIL)
+    sil_test, step_result = tgt_06_regression_test_sil(ep, step_results)
+    if step_result and step_result['status'] == 'ERROR':
+        return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
+
+    # Regression Test (MIL)
     if test_mil:
-        # folder
-        payload = {'folderKind': 'EXECUTION_RECORD', 'folderName' : 'new-mil' }
-        new_mil_folder = ep.post('folders', payload)
-        old_mil_folder = ep.get('folders?name=old-mil')[0]
-        # regression test
-        payload = {
-            'compMode': 'SL MIL',
-            'compFolderUID': new_mil_folder['uid']
-        }
-        mil_test = ep.post(f"folders/{old_mil_folder['uid']}/regression-tests", payload, message="Regression Test MIL vs. MIL")
-        # verdictStatus, failed, error, passed, total
-        print(f"Result: {mil_test['verdictStatus']}")
+        mil_test, step_result = tgt_07_regression_test_mil(ep, step_results)
+        if step_result and step_result['status'] == 'ERROR':
+            return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
 
-
-    ep.post('coverage-generation', { 'scopeUid' : toplevel_scope_uid, 'pllString': 'MCDC' })
-    b2b_coverage = ep.get(f"scopes/{toplevel_scope_uid}/coverage-results-b2b")
-
-    # Create project report using "regression-test" template
-    # and export project report to a file called '{model_name}-migration-test.html'
-    if test_mil: report_template = 'regression-test'
-    else: report_template = 'regression-sil-only'
-    report = ep.post(f"scopes/{toplevel_scope_uid}/project-report?template-name={report_template}", message="Creating test report")
-    ep.post(f"reports/{report['uid']}", { 'exportPath': result_dir, 'newName': f'{model_name}-migration-test' })
+    # Create report
+    b2b_coverage, step_result = tgt_08_create_report(ep, toplevel_uid, test_mil, result_dir, model_name, step_results)
+    if step_result and step_result['status'] == 'ERROR':
+        return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
 
     # Save *.epp, close application unless controlled externally
     ep.put('profiles', { 'path': epp_file })
     if not ep_api_object: ep.close_application()
 
     # time measurement
-    global tmp
-    duration_seconds = (datetime.now() - start_time).seconds
-    if model_name in tmp: duration_seconds += tmp[model_name]
+    return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, b2b_coverage=b2b_coverage, sil_test=sil_test)
 
-    result = {
-        'projectName' : f'{model_name}_{source_version}-vs-{matlab_version}',
-        'duration' : duration_seconds,
-        'statementCoverage' : b2b_coverage['StatementPropertyCoverage']['handledPercentage'],
-        'mcdcCoverage' : b2b_coverage['MCDCPropertyCoverage']['handledPercentage'],
-        'testResult' : sil_test['verdictStatus'],
-        'eppPath' : epp_rel_path,
-        'reportPath' : f"{model_name}-migration-test.html"
-    }
-    return result 
 
+def src_01_start_ep(ep_api_object, matlab_version, results):
+    # check if the ep api object is controlled externally
+    if ep_api_object:
+        return ep_api_object, None
+    else:
+        try:
+            step_result = { 'stepName' : 'BTC Startup' }
+            ep = start_ep_and_configure_matlab(matlab_version)
+            step_result['status'] = 'PASSED'
+        except Exception as e:
+            handle_error(ep, step_result)
+    results.append(step_result)
+    return ep, step_result
+
+def src_02_import_model(ep, model_path, script_path, model_name, matlab_version, results):
+    try:
+        step_result = { 'stepName' : 'Import Model' }
+        ep.post('profiles?discardCurrentProfile=true')
+        payload = {
+            'ecModelFile' : model_path,
+            'ecInitScript' : script_path
+        } 
+        ep.post('architectures/embedded-coder', payload, message=f"Importing {model_name}  with Matlab R{matlab_version}")
+        toplevel_uid = ep.get('scopes')[0]['uid']
+        step_result['status'] = 'PASSED'
+    except Exception as e:
+        handle_error(ep, step_result)
+    results.append(step_result)
+    return toplevel_uid, step_result
+
+def src_03_generate_vectors(ep, toplevel_uid, results):
+    try:
+        step_result = { 'stepName' : 'Generate Vectors' }
+        ep.post('coverage-generation', { 'scopeUid' : toplevel_uid, 'pllString': 'MCDC' }, message="Generating vectors")
+        b2b_coverage = ep.get(f"scopes/{toplevel_uid}/coverage-results-b2b")
+        print('Coverage ' + "{:.2f}%".format(b2b_coverage['MCDCPropertyCoverage']['handledPercentage']))
+        step_result['status'] = 'PASSED'
+    except Exception as e:
+        handle_error(ep, step_result)
+    results.append(step_result)
+    return step_result
+
+def src_04_reference_simulation(ep, toplevel_uid, test_mil, results):
+    try:
+        step_result = { 'stepName' : 'Reference Simulation' }
+        payload = { 'execConfigNames' : ['SL MIL', 'SIL'] if test_mil else ['SIL'] }
+        ep.post(f"scopes/{toplevel_uid}/testcase-simulation", payload, message=f"Reference Simulation on {payload['execConfigNames']}")
+
+        # Store MIL and SIL executions for comparison
+        all_execution_records = ep.get('execution-records')
+        payload = { "folderKind": "EXECUTION_RECORD" }
+        
+        # SIL
+        payload['folderName'] = 'old-sil'
+        old_sil_folder = ep.post('folders', payload)
+        sil_execution_records_uids = [ er['uid'] for er in all_execution_records if er['executionConfig'] == 'SIL']
+        ep.put(f"folders/{old_sil_folder['uid']}/execution-records", { 'UIDs' : sil_execution_records_uids })
+
+        # MIL
+        if test_mil:
+            payload['folderName'] = 'old-mil'
+            old_mil_folder = ep.post('folders', payload)
+            mil_execution_records_uids = [ er['uid'] for er in all_execution_records if er['executionConfig'] == 'SL MIL']
+            ep.put(f"folders/{old_mil_folder['uid']}/execution-records", { 'UIDs' : mil_execution_records_uids })
+
+        step_result['status'] = 'PASSED'
+    except Exception as e:
+        handle_error(ep, step_result)
+    results.append(step_result)
+    return step_result
+
+def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, model_name, accept_interface_changes, matlab_version, results):
+    try:
+        step_result = { 'stepName' : 'Update & Check Interface' }
+        # load BTC EmbeddedPlatform profile (*.epp) -> Update Model
+        ep.get(f'profiles/{epp_file}?discardCurrentProfile=true')
+
+        # check for interface changes (part 1)
+        toplevel_uid = ep.get('scopes')[0]['uid']
+        toplevel_signals_old = [signal['identifier'] for signal in ep.get(f'scopes/{toplevel_uid}/signals')]
+
+        # Arch Update
+        payload = {
+            'slModelFile' : model_path,
+            'slInitScript' : script_path
+        } 
+        ep.put(f"architectures/model-paths", payload)
+        ep.put('architectures', message=f"Updating model & generating code for {model_name} with Matlab {matlab_version}")
+        
+        # check for interface changes (part 2)
+        toplevel_uid = ep.get('scopes')[0]['uid'] # fetch again: scopes have new uids after update
+        toplevel_signals_new = [signal['identifier'] for signal in ep.get(f'scopes/{toplevel_uid}/signals')]
+        if not (toplevel_signals_old == toplevel_signals_new):
+            severity = 'CRITICAL' if accept_interface_changes else 'ERROR'
+            msg = f'The interface of {model_name} has changed:'
+            hint = f"""
+    - old interface: {toplevel_signals_old}
+    - new interface: {toplevel_signals_new}"""
+            ep.post('messages', { "message": msg, "hint": hint, "severity": severity })
+            warning = f"[WARNING] {msg}\n{hint}"
+            print(warning)
+            if not accept_interface_changes: raise Exception(warning)
+        step_result['status'] = 'PASSED'
+    except Exception as e:
+        handle_error(ep, step_result)
+    results.append(step_result)
+    return toplevel_uid, step_result
+
+def tgt_06_regression_test_sil(ep, results):
+    try:
+        step_result = { 'stepName' : 'Regression Test (SIL)' }
+        payload = {'folderKind': 'EXECUTION_RECORD', 'folderName' : 'new-sil' }
+        new_sil_folder = ep.post('folders', payload)
+        old_sil_folder = ep.get('folders?name=old-sil')[0]
+        # regression test
+        payload = { 
+            'compMode': 'SIL',
+            'compFolderUID' : new_sil_folder['uid']
+        }
+        sil_test = ep.post(f"folders/{old_sil_folder['uid']}/regression-tests", payload, message="Regression Test SIL vs. SIL")
+        # verdictStatus, failed, error, passed, total
+        print(f"Result: {sil_test['verdictStatus']}")
+        step_result['status'] = sil_test['verdictStatus']
+    except Exception as e:
+        handle_error(ep, step_result)
+    results.append(step_result)
+    return sil_test, step_result
+
+def tgt_07_regression_test_mil(ep, results):
+    try:
+        step_result = { 'stepName' : 'Regression Test (MIL)' }
+        payload = {'folderKind': 'EXECUTION_RECORD', 'folderName' : 'new-mil' }
+        new_mil_folder = ep.post('folders', payload)
+        old_mil_folder = ep.get('folders?name=old-mil')[0]
+        # regression test
+        payload = { 
+            'compMode': 'SL MIL',
+            'compFolderUID' : new_mil_folder['uid']
+        }
+        mil_test = ep.post(f"folders/{old_mil_folder['uid']}/regression-tests", payload, message="Regression Test MIL vs. MIL")
+        # verdictStatus, failed, error, passed, total
+        print(f"Result: {mil_test['verdictStatus']}")
+        step_result['status'] = mil_test['verdictStatus']
+    except Exception as e:
+        handle_error(ep, step_result)
+    results.append(step_result)
+    return mil_test, step_result
+
+def tgt_08_create_report(ep, toplevel_uid, test_mil, result_dir, model_name, results):
+    try:
+        # Create project report using "regression-test" template
+        # and export project report to a file called '{model_name}-migration-test.html'
+        step_result = { 'stepName' : 'Create Report' }
+        try: ep.post('coverage-generation', { 'scopeUid' : toplevel_uid, 'pllString': 'MCDC' })
+        except: pass
+        b2b_coverage = ep.get(f"scopes/{toplevel_uid}/coverage-results-b2b")
+        if test_mil: report_template = 'regression-test'
+        else: report_template = 'regression-sil-only'
+        report = ep.post(f"scopes/{toplevel_uid}/project-report?template-name={report_template}", message="Creating test report")
+        ep.post(f"reports/{report['uid']}", { 'exportPath': result_dir, 'newName': f'{model_name}-migration-test' })
+        step_result['status'] = 'PASSED'
+    except Exception as e:
+        handle_error(ep, step_result)
+    results.append(step_result)
+    return b2b_coverage, step_result
 
 def get_existing_references(execution_record_folder):
     mil_executions = [os.path.abspath(p) for p in glob.glob(f"{execution_record_folder}/MIL/*.mdf")]
     sil_executions = [os.path.abspath(p) for p in glob.glob(f"{execution_record_folder}/SIL/*.mdf")]
     return mil_executions, sil_executions
 
-def handle_error(ep, epp_file, step_result):
+def handle_error(ep, step_result, epp_file=None):
     step_result['status'] = 'ERROR'
-    step_result['message'] = traceback.format_exc()
-    ep.put('profiles', { 'path': epp_file }, message="Saving profile")
-    print(step_result['message'])
+    step_result['message'] = f"Error in step '{step_result['stepName']}'"
+    if epp_file: ep.put('profiles', { 'path': epp_file }, message="Saving profile after error")
+    # export messages to {model_name}_messages.html
+    global message_report_file
+    ep.post(f'messages/message-report?file-name={message_report_file}&marker-date={ep.message_marker_date}')
 
 def start_ep_and_configure_matlab(version):
     ep = EPRestApi()
@@ -218,3 +329,27 @@ def start_ep_and_configure_matlab(version):
 def get_epp_file_by_name(result_dir, model_path):
     model_name = os.path.basename(model_path)[:-4].replace('Wrapper_', '')
     return os.path.join(result_dir, model_name + '.epp'), model_name + '.epp'
+
+def get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, b2b_coverage=None, sil_test=None, error_message=None):
+    # calculate duration in seconds
+    global tmp
+    duration_seconds = (datetime.now() - start_time).seconds
+    if model_name in tmp: duration_seconds += tmp[model_name]
+    # return project result item
+    result = {
+        'projectName' : f'{model_name}_{source_version}-vs-{matlab_version}',
+        'eppPath' : epp_rel_path,
+        'reportPath' : f"{model_name}-migration-test.html",
+        'duration' : duration_seconds,
+        'errorMessage' : error_message
+    }
+    if b2b_coverage:
+        result['statementCoverage'] = b2b_coverage['StatementPropertyCoverage']['handledPercentage']
+        result['mcdcCoverage'] = b2b_coverage['MCDCPropertyCoverage']['handledPercentage']
+    if sil_test:
+        result['testResult'] = sil_test['verdictStatus']
+    if error_message:
+        result['testResult'] = 'ERROR'
+        result['reportPath'] = f"{model_name}_messages.html"
+    
+    return result
