@@ -11,31 +11,48 @@ tmp = {}
 source_version = None
 message_report_file = None
 
-def migration_suite_source(models, matlab_version):
+def migration_suite_source(models, matlab_version, toolchain_script=None):
     """For each of the given models this function generates tests for
     full coverage on the given model using the specified Matlab version,
     then performs a MIL and SIL simulation to record the reference behavior."""
     global source_version
     source_version = matlab_version
+    
+    # clear results folder
     shutil.rmtree('results', ignore_errors=True)
-    model_results = {}
+    
+    # start ep, connect to selected matlab version and run toolchain script
     ep = start_ep_and_configure_matlab(matlab_version)
+    if toolchain_script: # evaluate toolchain script in the base workspace
+        ep.post('execute-long-matlab-script', {'scriptName' : 'evalin', 'inArgs' : [ 'base', toolchain_script ]})
+
+    # run migration source part for all models
+    model_results = {}
     for old_model in models:
         migration_source(old_model, matlab_version, ep_api_object=ep, model_results=model_results)
+
     ep.close_application()
     return model_results
 
-def migration_suite_target(models, matlab_version, model_results=None, accept_interface_changes=False):
+def migration_suite_target(models, matlab_version, model_results=None, accept_interface_changes=False, toolchain_script=None):
     """For each of the given models this function
     imports the reference execution records and simulates the same
     vectors on MIL and SIL based on the specified Matlab version. This
     regression test will show any changed behavior compared to the provided 
     reference execution."""
     results = []
+
+    # start ep, connect to selected matlab version and run toolchain script
     ep = start_ep_and_configure_matlab(matlab_version)
+    if toolchain_script: # evaluate toolchain script in the base workspace
+        ep.post('execute-long-matlab-script', {'scriptName' : 'evalin', 'inArgs' : [ 'base', toolchain_script ]})
+
+    # run migration target part for all models and collect results
     for new_model in models:
         result = migration_target(new_model, matlab_version, ep_api_object=ep, model_results=model_results, accept_interface_changes=accept_interface_changes)
         results.append(result)
+
+    # close application and create summary report
     ep.close_application()
     create_test_report_summary(results, 'BTC Migration Test Suite', 'BTCMigrationTestSuite.html', 'results')
     return model_results

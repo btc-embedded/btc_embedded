@@ -217,7 +217,7 @@ class EPRestApi:
 
     # it's not important if the path starts with /, ep/ or directly with a resource
     def _url(self, path):
-        return f"{self._HOST_}:{self._PORT_}/ep/{path.lstrip('/')}"
+        return f"{self._HOST_}:{self._PORT_}/ep/{path.lstrip('/')}".replace('/ep/ep/', '/ep/')
 
     # This method is used to poll a request until the progress is done.
     def _check_long_running(self, response):
