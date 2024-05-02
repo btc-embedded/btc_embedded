@@ -14,6 +14,7 @@ from btc_embedded.config import BTC_CONFIG_ENVVAR_NAME, get_global_config
 
 HEADERS = {'Accept': 'application/json, text/plain', 'Content-Type' : 'application/json'}
 DATE_FORMAT = '%d-%b-%Y %H:%M:%S'
+EXCLUDED_ERROR_MESSAGES = [ 'The compiler is already defined', 'No message found for the given query.' ]
 
 class EPRestApi:
     #Starter for the EP executable
@@ -136,11 +137,14 @@ class EPRestApi:
             path = f"/message-markers/{self.message_marker_date}/messages"
             if search_string: path += '?search-string=' + search_string
             if severity: path += ('&' if search_string else '?') + f"severity={severity}"
-            messages = self.get(path)
-            messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT))
-            for msg in messages:
-                print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
-            print("\n")
+            try:
+                messages = self.get(path)
+                messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT))
+                for msg in messages:
+                    print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
+                print("\n")
+            except:
+                pass
 
     # - - - - - - - - - - - - - - - - - - - - 
     #   DEPRICATED PUBLIC FUNCTIONS
@@ -223,11 +227,11 @@ class EPRestApi:
     def _check_long_running(self, response):
         if not response.ok:
             response_content = response.content.decode('utf-8')
-            # if more of these whitelisted errors show up: optimize approach
-            if not 'The compiler is already defined' in response_content:
+            # if the error is none of the excluded messages -> print messages, etc.
+            if all(msg not in response_content for msg in EXCLUDED_ERROR_MESSAGES):
                 print(f"\n\nError: {response_content}\n\n")
                 self.print_messages()
-                raise Exception(f"Received unsuccessful response from EP.")
+                raise Exception(response_content)
         if response.status_code == 202:
             jsonResponse = response.json()
             for key, value in jsonResponse.items():
