@@ -23,20 +23,18 @@ def create_test_report_summary(results, report_title='BTC Test Report Summary', 
         print("No data provided to 'create_test_report_summary' method.")
         return
     
-    with resources.path("btc_embedded", "btc_summary_report.template") as template_file:
-        BTC_SUMMARY_REPORT_TEMPLATE = str(template_file)
     # aggregate total_duration and overall_status
     total_duration = sum(project['duration'] for project in results)
     overall_status = "ERROR" if any(project["testResult"] == "ERROR" for project in results) else ("FAILED" if any(project["testResult"] == "FAILED" for project in results) else "PASSED")
-
-    # import html template
-    with open(BTC_SUMMARY_REPORT_TEMPLATE) as f:
-        html_template = f.read()
-
+    
     # prepare projects_string, containing info for all projects
     projects_string = ''
     for result in results:
         projects_string += get_project_string(result) + '\r\n'
+
+    # import html template
+    with open(os.path.join(resources.files('btc_embedded'), 'resources', 'btc_summary_report.template'), 'r') as template_file:
+        html_template = template_file.read()
 
     # fill placeholders in template
     final_html = html_template.replace('__title__', report_title)\

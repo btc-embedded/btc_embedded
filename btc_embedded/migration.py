@@ -4,6 +4,7 @@ import shutil
 from datetime import datetime
 from urllib.parse import quote
 
+import btc_embedded.util as util
 from btc_embedded.api import EPRestApi
 from btc_embedded.reporting import create_test_report_summary
 
@@ -121,8 +122,13 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     script_path = os.path.abspath(new_model['script']) if 'script' in new_model and new_model['script'] else None
     result_dir = os.path.abspath('results')
     message_report_file = quote(os.path.join(result_dir, f'{model_name}_messages.html'))
-    if epp_file: epp_rel_path = None
-    else: epp_file, epp_rel_path = get_epp_file_by_name(result_dir, model_path)
+    if epp_file:
+        epp_rel_path = None
+        if os.path.realpath(result_dir) in os.path.realpath(epp_file):
+            epp_rel_path = os.path.realpath(epp_file).replace(os.path.realpath(result_dir), '')
+            while epp_rel_path.startswith(os.sep): epp_rel_path = epp_rel_path[1:]
+    else:
+        epp_file, epp_rel_path = get_epp_file_by_name(result_dir, model_path)
     step_results = model_results[model_name] if model_results else []
     
     # start ep or use provided api object
@@ -158,6 +164,26 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     # time measurement
     return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, b2b_coverage=b2b_coverage, sil_test=sil_test)
 
+def migration_test(old_model, old_matlab, new_model=None, new_matlab=None, test_mil=False):
+    """Convenience 1-liner to test:
+    - if a given model yields the same results with a different matlab version
+    - if a refactored model yields the same results
+
+    By default, only SIL <-> SIL is tested
+    """
+    # step 1
+    btc_project = migration_source(old_model, old_matlab, test_mil=test_mil)
+    
+    # clean up if same model is used
+    new_matlab = new_matlab if new_matlab else old_matlab
+    new_model = new_model if new_model else old_model
+    if (new_model['model'] == old_model['model']):
+        model_dir = os.path.dirname(new_model['model'])
+        clear_sl_cachefiles(model_dir)
+
+    # step 2
+    result = migration_target(new_model, new_matlab, epp_file=btc_project)
+    return result
 
 def src_01_start_ep(ep_api_object, matlab_version, results):
     # check if the ep api object is controlled externally
@@ -176,12 +202,27 @@ def src_01_start_ep(ep_api_object, matlab_version, results):
 def src_02_import_model(ep, model_path, script_path, model_name, matlab_version, results):
     try:
         step_result = { 'stepName' : 'Import Model' }
+        toplevel_uid = None
         ep.post('profiles?discardCurrentProfile=true')
-        payload = {
-            'ecModelFile' : model_path,
-            'ecInitScript' : script_path
-        } 
-        ep.post('architectures/embedded-coder', payload, message=f"Importing {model_name}  with Matlab R{matlab_version}")
+        message=f"Importing {model_name}  with Matlab R{matlab_version}"
+
+        # perform architecture import based on codegen type
+        codegen_type = util.determine_codegen_type(ep, model_path)
+        if codegen_type == 'EC':
+            payload = {
+                'ecModelFile' : model_path,
+                'ecInitScript' : script_path
+            } 
+            ep.post('architectures/embedded-coder', payload, message=message)
+        elif codegen_type == 'TL':
+            payload = {
+                'tlModelFile' : model_path,
+                'tlInitScript' : script_path
+            } 
+            ep.post('architectures/targetlink', payload, message=message)
+        else:
+            raise Exception('Unsupported code generation config.')
+
         toplevel_uid = ep.get('scopes')[0]['uid']
         step_result['status'] = 'PASSED'
     except Exception as e:
@@ -203,8 +244,9 @@ def src_03_generate_vectors(ep, toplevel_uid, results):
 
 def src_04_reference_simulation(ep, toplevel_uid, test_mil, results):
     try:
+        mil_sil_configs = ep.get('execution-configs')['execConfigNames']
         step_result = { 'stepName' : 'Reference Simulation' }
-        payload = { 'execConfigNames' : ['SL MIL', 'SIL'] if test_mil else ['SIL'] }
+        payload = { 'execConfigNames' : mil_sil_configs if test_mil else ['SIL'] }
         ep.post(f"scopes/{toplevel_uid}/testcase-simulation", payload, message=f"Reference Simulation on {payload['execConfigNames']}")
 
         # Store MIL and SIL executions for comparison
@@ -221,7 +263,8 @@ def src_04_reference_simulation(ep, toplevel_uid, test_mil, results):
         if test_mil:
             payload['folderName'] = 'old-mil'
             old_mil_folder = ep.post('folders', payload)
-            mil_execution_records_uids = [ er['uid'] for er in all_execution_records if er['executionConfig'] == 'SL MIL']
+            mil_execution_config = next(cfg for cfg in mil_sil_configs if 'MIL' in cfg)
+            mil_execution_records_uids = [ er['uid'] for er in all_execution_records if er['executionConfig'] == mil_execution_config]
             ep.put(f"folders/{old_mil_folder['uid']}/execution-records", { 'UIDs' : mil_execution_records_uids })
 
         step_result['status'] = 'PASSED'
@@ -241,12 +284,23 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, mod
         toplevel_signals_old = [signal['identifier'] for signal in ep.get(f'scopes/{toplevel_uid}/signals')]
 
         # Arch Update
-        payload = {
-            'slModelFile' : model_path,
-            'slInitScript' : script_path
-        } 
+        message=f"Updating model & generating code for {model_name} with Matlab {matlab_version}"
+        # get mil config (can be TL MIL or SL MIL)
+        mil_config = next(cfg for cfg in ep.get('execution-configs')['execConfigNames'] if 'MIL' in cfg)
+        if mil_config == 'SL MIL':
+            payload = {
+                'slModelFile' : model_path,
+                'slInitScript' : script_path
+            } 
+        elif mil_config == 'TL MIL':
+            payload = {
+                'tlModelFile' : model_path,
+                'tlInitScript' : script_path
+            } 
+        else:
+            raise Exception(f"Unsupported architecture / config: '{mil_config}'")
         ep.put(f"architectures/model-paths", payload)
-        ep.put('architectures', message=f"Updating model & generating code for {model_name} with Matlab {matlab_version}")
+        ep.put('architectures', message=message)
         
         # check for interface changes (part 2)
         toplevel_uid = ep.get('scopes')[0]['uid'] # fetch again: scopes have new uids after update
@@ -290,12 +344,14 @@ def tgt_06_regression_test_sil(ep, results):
 def tgt_07_regression_test_mil(ep, results):
     try:
         step_result = { 'stepName' : 'Regression Test (MIL)' }
+        # get mil config (can be TL MIL or SL MIL)
+        mil_config = next(cfg for cfg in ep.get('execution-configs')['execConfigNames'] if 'MIL' in cfg)
         payload = {'folderKind': 'EXECUTION_RECORD', 'folderName' : 'new-mil' }
         new_mil_folder = ep.post('folders', payload)
         old_mil_folder = ep.get('folders?name=old-mil')[0]
         # regression test
         payload = { 
-            'compMode': 'SL MIL',
+            'compMode': mil_config,
             'compFolderUID' : new_mil_folder['uid']
         }
         mil_test = ep.post(f"folders/{old_mil_folder['uid']}/regression-tests", payload, message="Regression Test MIL vs. MIL")
@@ -312,12 +368,14 @@ def tgt_08_create_report(ep, toplevel_uid, test_mil, result_dir, model_name, res
         # Create project report using "regression-test" template
         # and export project report to a file called '{model_name}-migration-test.html'
         step_result = { 'stepName' : 'Create Report' }
-        try: ep.post('coverage-generation', { 'scopeUid' : toplevel_uid, 'pllString': 'MCDC' })
-        except: pass
+        # try: ep.post('coverage-generation', { 'scopeUid' : toplevel_uid, 'pllString': 'MCDC' })
+        # except: pass
         b2b_coverage = ep.get(f"scopes/{toplevel_uid}/coverage-results-b2b")
-        if test_mil: report_template = 'regression-test'
-        else: report_template = 'regression-sil-only'
-        report = ep.post(f"scopes/{toplevel_uid}/project-report?template-name={report_template}", message="Creating test report")
+        # select the appropriate report template
+        report_template = select_report_template(ep, test_mil)
+        query_param = f'?template-name={report_template}' if report_template else ''
+        # create report
+        report = ep.post(f"scopes/{toplevel_uid}/project-report{query_param}", message="Creating test report")
         ep.post(f"reports/{report['uid']}", { 'exportPath': result_dir, 'newName': f'{model_name}-migration-test' })
         step_result['status'] = 'PASSED'
     except Exception as e:
@@ -347,9 +405,29 @@ def get_epp_file_by_name(result_dir, model_path):
     model_name = os.path.basename(model_path)[:-4].replace('Wrapper_', '')
     return os.path.join(result_dir, model_name + '.epp'), model_name + '.epp'
 
+def select_report_template(ep, test_mil):
+    # pick the right report template
+    if test_mil:
+        mil_config = next(cfg for cfg in ep.get('execution-configs')['execConfigNames'] if 'MIL' in cfg)
+        report_template = 'regression-test-ec' if mil_config == 'SL MIL' else 'regression-test-tl'
+    else:
+        report_template = 'regression-test-sil-only'
+    return report_template
+
+def clear_sl_cachefiles(dir=os.getcwd()):
+    try:
+        shutil.rmtree(os.path.join(dir, 'slprj'), ignore_errors=True)
+        shutil.rmtree(os.path.join(dir, 'TLProj'), ignore_errors=True)
+        shutil.rmtree(os.path.join(dir, 'TLSim'), ignore_errors=True)
+        [os.remove(os.path.join(dir, file)) for file in glob.glob('*.slxc', root_dir=dir)]
+        [shutil.rmtree(os.path.join(dir, rtw_dir)) for rtw_dir in glob.glob('*_rtw', root_dir=dir)]
+    except Exception as e:
+        raise Exception(f"Error removing model cache files in '{dir}'. " + repr(e))
+
 def get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, b2b_coverage=None, sil_test=None, error_message=None):
     # calculate duration in seconds
     global tmp
+    global source_version
     duration_seconds = (datetime.now() - start_time).seconds
     if model_name in tmp: duration_seconds += tmp[model_name]
     # return project result item

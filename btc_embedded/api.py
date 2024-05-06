@@ -6,12 +6,14 @@ import signal
 import subprocess
 import time
 from datetime import datetime
+from importlib import resources
 from urllib.parse import quote, unquote
 
 import requests
 
 from btc_embedded.config import BTC_CONFIG_ENVVAR_NAME, get_global_config
 
+VERSION_PATTERN = r'ep(\d+\.\d+[a-zA-Z]\d+)' # e.g. "ep24.3p1"
 HEADERS = {'Accept': 'application/json, text/plain', 'Content-Type' : 'application/json'}
 DATE_FORMAT = '%d-%b-%Y %H:%M:%S'
 EXCLUDED_ERROR_MESSAGES = [ 'The compiler is already defined', 'No message found for the given query.' ]
@@ -42,6 +44,9 @@ class EPRestApi:
         if 'startupTimeout' in config: timeout = config['startupTimeout']
         # set install location based on install_root and version if set explicitly
         if version and install_root: install_location = f"{install_root}/ep{version}"
+        if install_location and not version:
+            match = re.search(VERSION_PATTERN, install_location)
+            if match: version = match.group(1)
         # fallback: determine based on config
         if not (version and install_location) and 'installationRoot' in config and 'epVersion' in config:
             version = config['epVersion']
@@ -261,7 +266,9 @@ class EPRestApi:
                     self.set_compiler(value=config['preferences'][pref_key])
                 elif pref_key == 'REPORT_TEMPLATE_FOLDER':
                     template_folder = self._rel_to_abs(config['preferences'][pref_key])
-                    if template_folder: preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': template_folder })
+                    if not (template_folder and os.path.isdir(template_folder)):
+                        self._install_report_templates(template_folder)
+                    preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': template_folder })
                 # all other cases
                 else:
                     preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': config['preferences'][pref_key] })
@@ -419,6 +426,16 @@ class EPRestApi:
 
     def _is_ep_process_still_alive(self):
         return self.ep_process.poll() is None
+
+    def _install_report_templates(self, template_folder):
+        try:
+            def xml_filter(_, names): return [name for name in names if not name.endswith('.xml')]
+            os.makedirs(template_folder, exist_ok=True)
+            resources_folder = os.path.join(resources.files('btc_embedded'), 'resources', 'projectreport_templates')
+            shutil.copytree(resources_folder, template_folder, ignore=xml_filter, dirs_exist_ok=True)
+            print(f"Installed project report templates to '{template_folder}'")
+        except:
+            print(f"[WARNING] Could not install report templates to '{template_folder}'")
 
 # if called directly, starts EP based on the global config
 if __name__ == '__main__':

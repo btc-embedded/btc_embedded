@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template>
+	<topic id="general">
+		<section id="general_interface" />
+		<section id="general_metaInformation" />
+	</topic>
+	<topic id="b2b">
+		<topicOption id="executionModes" type="MULTI" value="[SL MIL, SIL]" />
+		<section id="b2b_codeAnalysis">
+			<sectionOption orderId="204010" id="codeCoverage" type="BOOL" value="true" />
+			<sectionOption orderId="204010" id="robustnessChecks" type="BOOL" value="false" />
+			<sectionOption orderId="204020" id="domainChecksStatistics" type="BOOL" value="false" />
+			<sectionOption orderId="204030" id="udcgStatistics" type="BOOL" value="false" />
+		</section>
+		<section id="b2b_regressionTest">
+			<sectionOption orderId="202010" id="testDetails" type="BOOL" value="true" />
+			<sectionOption orderId="202010" id="includeLastX" type="INT" value="2" />
+			<sectionOption orderId="202010" id="comparisonResults" type="BOOL" value="true" />
+			<sectionOption orderId="202010" id="executionRecordComparisons" type="BOOL" value="true" />
+			<sectionOption orderId="202010" id="testResultsOverview" type="BOOL" value="true" />
+			<sectionOption orderId="202010" id="toleranceDefinition" type="BOOL" value="true" />
+		</section>
+	</topic>
+</template>

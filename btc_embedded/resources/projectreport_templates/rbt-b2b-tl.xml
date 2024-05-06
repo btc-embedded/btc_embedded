@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template>
+	<topic id="general">
+		<section id="general_interface" />
+		<section id="general_metaInformation" />
+	</topic>
+	<topic id="b2b">
+		<topicOption id="executionModes" type="MULTI" value="[TL MIL, SIL]" />
+		<section id="b2b_modelCoverage">
+			<sectionOption orderId="205010" id="executionCoverageStatistics" type="BOOL" value="true" />
+			<sectionOption orderId="205010" id="transitionCoverageStatistics" type="BOOL" value="true" />
+			<sectionOption orderId="205010" id="stateCoverageStatistics" type="BOOL" value="true" />
+			<sectionOption orderId="205010" id="generalCoverageStatistics" type="BOOL" value="true" />
+			<sectionOption orderId="205010" id="lookupTableCoverageStatistics" type="BOOL" value="true" />
+		</section>
+		<section id="b2b_codeAnalysis">
+			<sectionOption orderId="204010" id="codeCoverage" type="BOOL" value="true" />
+			<sectionOption orderId="204010" id="robustnessChecks" type="BOOL" value="true" />
+			<sectionOption orderId="204020" id="domainChecksStatistics" type="BOOL" value="true" />
+			<sectionOption orderId="204030" id="udcgStatistics" type="BOOL" value="true" />
+		</section>
+		<section id="b2b_regressionTest">
+			<sectionOption orderId="202010" id="testDetails" type="BOOL" value="true" />
+			<sectionOption orderId="202010" id="comparisonResults" type="BOOL" value="true" />
+			<sectionOption orderId="202010" id="includeLastX" type="INT" value="9999" />
+			<sectionOption orderId="202010" id="executionRecordComparisons" type="BOOL" value="true" />
+			<sectionOption orderId="202010" id="testResultsOverview" type="BOOL" value="true" />
+			<sectionOption orderId="202010" id="toleranceDefinition" type="BOOL" value="true" />
+		</section>
+		<section id="b2b_b2bTest">
+			<sectionOption orderId="201010" id="testDetails" type="BOOL" value="true" />
+			<sectionOption orderId="201010" id="includeLastX" type="INT" value="9999" />
+			<sectionOption orderId="201010" id="comparisonResults" type="BOOL" value="true" />
+			<sectionOption orderId="201010" id="executionRecordComparisons" type="BOOL" value="true" />
+			<sectionOption orderId="201010" id="testResultsOverview" type="BOOL" value="true" />
+			<sectionOption orderId="201010" id="toleranceDefinition" type="BOOL" value="true" />
+		</section>
+	</topic>
+	<topic id="rbt">
+		<topicOption id="executionModes" type="MULTI" value="[TL MIL, SIL]" />
+		<section id="rbt_modelCoverage">
+			<sectionOption orderId="105010" id="executionCoverageStatistics" type="BOOL" value="true" />
+			<sectionOption orderId="105010" id="transitionCoverageStatistics" type="BOOL" value="true" />
+			<sectionOption orderId="105010" id="stateCoverageStatistics" type="BOOL" value="true" />
+			<sectionOption orderId="105010" id="generalCoverageStatistics" type="BOOL" value="true" />
+			<sectionOption orderId="105010" id="lookupTableCoverageStatistics" type="BOOL" value="true" />
+		</section>
+		<section id="rbt_testExecution">
+			<sectionOption orderId="101010" id="detailedResults" type="BOOL" value="true" />
+			<sectionOption orderId="101010" id="resultsOveview" type="BOOL" value="true" />
+			<sectionOption orderId="101010" id="globalTolerances" type="BOOL" value="true" />
+		</section>
+		<section id="rbt_formalTest">
+			<sectionOption orderId="103010" id="resultsOverview" type="BOOL" value="true" />
+			<sectionOption orderId="103010" id="details" type="BOOL" value="true" />
+		</section>
+		<section id="rbt_requirementTraceability" />
+		<section id="rbt_codeAnalysis">
+			<sectionOption orderId="104020" id="domainChecksStatistics" type="BOOL" value="true" />
+			<sectionOption orderId="104010" id="codeCoverage" type="BOOL" value="true" />
+			<sectionOption orderId="104010" id="robustnessChecks" type="BOOL" value="true" />
+			<sectionOption orderId="104030" id="udcgStatistics" type="BOOL" value="true" />
+		</section>
+	</topic>
+</template>
