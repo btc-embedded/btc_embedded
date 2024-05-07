@@ -16,7 +16,7 @@
 
 # General settings - will be considered when creating the api object: ep = EPRestApi()
 installationRoot: C:/Program Files/BTC
-epVersion: 23.3p0
+epVersion: 24.1p0
 #licenseLocation: 27000@10.18.2.1
 
 # Preferences: key-value pairs according to
@@ -25,10 +25,21 @@ epVersion: 23.3p0
 #   indicated by the environment variable BTC_API_CONFIG_FILE
 # - the existance of the env var is mandatory for using relative path.
 preferences:
-  GENERAL_MATLAB_CUSTOM_VERSION: MATLAB R2022b (64-bit)
-  GENERAL_COMPILER_SETTING: MinGW64 (64bit)
+  GENERAL_MATLAB_CUSTOM_VERSION: MATLAB R2023b (64-bit)
+  GENERAL_COMPILER_SETTING: (Internal) MinGW64 (64bit)
   SIMULATION_MIL_NUMBER_OF_MATLAB_INSTANCES: 1
   REPORT_TEMPLATE_FOLDER: report-templates
+  # vector generation settings
+  SV_GEN_HEURISTIC: ATG+CV
+  SV_GEN_CV_PARALLEL_ENGINE_MODE: BALANCED
+  SV_GEN_CV_ENGINES: SMIBMC:0,VIS:0,AUTOFXP:0,CBMC:1,ISAT:1
+  SV_GEN_ATG_TIMEOUT_SCOPE: 15                              # atg-timeout per scope
+  SV_GEN_CV_TIMEOUT_PROPERTY: 20                            # cv-timeout per property
+  SV_GEN_GLOBAL_TIMEOUT: 180                                # global timeout
+  SV_GEN_HIERARCHICALLY: false                              # only generate on entrypoint function
+  # settings for EmbeddedCoder Architecture Update
+  EC_ARCHITECTURE_UPDATE_CODE_META_SOURCE: MODEL_ANALYSIS
+  EC_ARCHITECTURE_UPDATE_MAPPING_SOURCE: PROFILE
 
 # Additionally, you can specify arbitrary key-value pairs to use them in your scripts
 # The goal is to separate any configuration from the code, so you can adapt your

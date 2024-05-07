@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='btc_embedded',
-    version='24.1.19',
+    version='24.1.20',
     packages=['btc_embedded'],
     include_package_data=True,
     license='MIT',
@@ -16,8 +16,6 @@ setup(
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Testing',
         'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',

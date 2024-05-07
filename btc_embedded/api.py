@@ -6,12 +6,12 @@ import signal
 import subprocess
 import time
 from datetime import datetime
-from importlib import resources
 from urllib.parse import quote, unquote
 
 import requests
 
 from btc_embedded.config import BTC_CONFIG_ENVVAR_NAME, get_global_config
+from btc_embedded.helpers import install_btc_config, install_report_templates
 
 VERSION_PATTERN = r'ep(\d+\.\d+[a-zA-Z]\d+)' # e.g. "ep24.3p1"
 HEADERS = {'Accept': 'application/json, text/plain', 'Content-Type' : 'application/json'}
@@ -39,7 +39,11 @@ class EPRestApi:
         self.definitively_closed = False
         self.actively_started = False
         # use default config, if no config was specified
-        if not config: config = get_global_config()
+        if not config:
+            if platform.system() == 'Windows':
+                config = install_btc_config()
+            else:
+                config = get_global_config()
         # apply timeout from config if specified
         if 'startupTimeout' in config: timeout = config['startupTimeout']
         # set install location based on install_root and version if set explicitly
@@ -267,7 +271,7 @@ class EPRestApi:
                 elif pref_key == 'REPORT_TEMPLATE_FOLDER':
                     template_folder = self._rel_to_abs(config['preferences'][pref_key])
                     if not (template_folder and os.path.isdir(template_folder)):
-                        self._install_report_templates(template_folder)
+                        install_report_templates(template_folder)
                     preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': template_folder })
                 # all other cases
                 else:
@@ -320,7 +324,7 @@ class EPRestApi:
             path = urlappendix[9:index_qmark] if index_qmark > 0 else urlappendix[9:]
             suffix = urlappendix[index_qmark:] if index_qmark > 0 else ""
             path = unquote(path) # unquote incase caller already quoted the path
-            if not os.path.isfile(path):
+            if not os.path.isfile(path) and self._is_localhost():
                 print(f"\nThe profile '{path}' cannot be found. Please ensure that the file is available.\n")
                 exit(1)
             path = quote(path, safe="")
@@ -427,15 +431,9 @@ class EPRestApi:
     def _is_ep_process_still_alive(self):
         return self.ep_process.poll() is None
 
-    def _install_report_templates(self, template_folder):
-        try:
-            def xml_filter(_, names): return [name for name in names if not name.endswith('.xml')]
-            os.makedirs(template_folder, exist_ok=True)
-            resources_folder = os.path.join(resources.files('btc_embedded'), 'resources', 'projectreport_templates')
-            shutil.copytree(resources_folder, template_folder, ignore=xml_filter, dirs_exist_ok=True)
-            print(f"Installed project report templates to '{template_folder}'")
-        except:
-            print(f"[WARNING] Could not install report templates to '{template_folder}'")
+    def _is_localhost(self):
+        return self._HOST_ in [ 'http://localhost', 'http://127.0.0.1']
+
 
 # if called directly, starts EP based on the global config
 if __name__ == '__main__':

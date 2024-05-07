@@ -20,9 +20,9 @@ def __get_global_config():
         return config, global_config_file_path
     # Option B: use defaults shipped with this module
     else:
-        with resources.path("btc_embedded", "btc_config.yml") as global_config_file:
-            config = __load_config(str(global_config_file))
-            return config, global_config_file
+        config_file_template = os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config.yml')
+        config = __load_config(str(config_file_template))
+        return config, config_file_template
 
 def get_project_specific_config(project_directory=os.getcwd(), project_config=None):
     """Returns the project-specific config, which is the first file
@@ -62,7 +62,6 @@ def get_merged_config(project_directory=os.getcwd(), silent=False, project_confi
     # merge them and return the merged config
     config.update(project_specific_config)
     return config
-
 
 def get_vector_gen_config(scope_uid, config=None):
     """@DEPRICATED
