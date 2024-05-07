@@ -5,7 +5,8 @@ from importlib import resources
 
 import yaml
 
-from btc_embedded.config import BTC_CONFIG_ENVVAR_NAME
+from btc_embedded.config import (BTC_CONFIG_DEFAULTLOCATION,
+                                 BTC_CONFIG_ENVVAR_NAME)
 
 VERSION_PATTERN_2 = r'(\d+\.\d+[a-zA-Z]\d+)' # e.g.   "24.3p1"
 
@@ -22,6 +23,11 @@ def install_btc_config():
         except:
             pass
     if BTC_CONFIG_ENVVAR_NAME in os.environ and os.path.exists(os.environ[BTC_CONFIG_ENVVAR_NAME]):
+        return
+    if not BTC_CONFIG_ENVVAR_NAME in os.environ:
+        # set variable for this session
+        os.environ[BTC_CONFIG_ENVVAR_NAME] = BTC_CONFIG_DEFAULTLOCATION
+    if os.path.exists(BTC_CONFIG_DEFAULTLOCATION):
         return
     else:
         key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\BTC")
@@ -48,22 +54,19 @@ def install_btc_config():
             config_file_template = os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config.yml')
             with open(config_file_template, 'r') as f:
                 config = yaml.safe_load(f) or {}
-                config['installationRoot'] = install_location.replace(ep_version, '')[:-1]
+                config['installationRoot'] = install_location.replace(f'ep{ep_version}', '')[:-1]
                 config['epVersion'] = ep_version
-                config['preferences']['GENERAL_MATLAB_CUSTOM_VERSION'] = highest_ml_version
+                if highest_ml_version:
+                    config['preferences']['GENERAL_MATLAB_CUSTOM_VERSION'] = highest_ml_version
 
             # dump adapted template to btc_config location
-            if BTC_CONFIG_ENVVAR_NAME in os.environ:
-                global_config = os.environ[BTC_CONFIG_ENVVAR_NAME]
-            else:
-                global_config = r'C:/ProgramData/BTC/ep/btc_config.yml'
-                # set variable for this session
-                os.environ[BTC_CONFIG_ENVVAR_NAME] = global_config
+            global_config = os.environ[BTC_CONFIG_ENVVAR_NAME]
+            
             with open(global_config, 'w') as f:
                 yaml.safe_dump(config, f)
             
-            print(f"Applied initial btc_config template to '{global_config}'. Please verify the initial configuration.")
-            print(f"""Using the following settings:
+            print(f"Applied initial btc_config template to '{global_config}'.")
+            print(f"""Please verify the initial configuration:
     - BTC EmbeddedPlatform {ep_version} (installed at: '{install_location}')
     - {highest_ml_version}
     - Compiler: {config['preferences']['GENERAL_COMPILER_SETTING']}

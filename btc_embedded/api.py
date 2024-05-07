@@ -20,7 +20,7 @@ EXCLUDED_ERROR_MESSAGES = [ 'The compiler is already defined', 'No message found
 
 class EPRestApi:
     #Starter for the EP executable
-    def __init__(self, host='http://localhost', port=1337, version=None, install_root=None, install_location=None, lic='', config=None, license_location=None, timeout=120, skip_matlab_start=False):
+    def __init__(self, host='http://localhost', port=1337, version=None, install_root=None, install_location=None, lic='', config=None, license_location=None, timeout=120, skip_matlab_start=False, skip_config_install=False):
         """
         Wrapper for the BTC EmbeddedPlatform REST API
         - when created without arguments, it uses the default install 
@@ -40,10 +40,9 @@ class EPRestApi:
         self.actively_started = False
         # use default config, if no config was specified
         if not config:
-            if platform.system() == 'Windows':
-                config = install_btc_config()
-            else:
-                config = get_global_config()
+            if platform.system() == 'Windows' and self._is_localhost() and not skip_config_install:
+                install_btc_config()
+            config = get_global_config()
         # apply timeout from config if specified
         if 'startupTimeout' in config: timeout = config['startupTimeout']
         # set install location based on install_root and version if set explicitly

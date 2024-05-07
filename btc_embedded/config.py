@@ -1,10 +1,12 @@
 import fnmatch
 import os
+import platform
 from importlib import resources
 
 import yaml
 
 BTC_CONFIG_ENVVAR_NAME = 'BTC_API_CONFIG_FILE'
+BTC_CONFIG_DEFAULTLOCATION = 'C:/ProgramData/BTC/btc_config.yml'
 
 def get_global_config():
     config, _ = __get_global_config()
@@ -16,13 +18,17 @@ def __get_global_config():
     # Option A: set via environment variable
     if BTC_CONFIG_ENVVAR_NAME in os.environ and os.path.isfile(os.environ[BTC_CONFIG_ENVVAR_NAME]):
         global_config_file_path = os.environ[BTC_CONFIG_ENVVAR_NAME]
-        config = __load_config(global_config_file_path)
-        return config, global_config_file_path
-    # Option B: use defaults shipped with this module
+    # Option B: use btc_config from default location
+    elif platform.system() == 'Windows' and os.path.isfile(BTC_CONFIG_DEFAULTLOCATION):
+        global_config_file_path = BTC_CONFIG_DEFAULTLOCATION
+    # Option C: use defaults shipped with this module
     else:
         config_file_template = os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config.yml')
-        config = __load_config(str(config_file_template))
-        return config, config_file_template
+        global_config_file_path = str(config_file_template)
+    # load config
+    config = __load_config(global_config_file_path)
+    print(f"Applying global config from '{global_config_file_path}'")
+    return config, global_config_file_path
 
 def get_project_specific_config(project_directory=os.getcwd(), project_config=None):
     """Returns the project-specific config, which is the first file
