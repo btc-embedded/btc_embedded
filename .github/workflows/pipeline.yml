@@ -24,6 +24,7 @@ jobs:
       run: |
         .\venv\Scripts\activate
         python test/test.py test/test.epp
+      shell: pwsh
 
   test-docker:
     runs-on: self-hosted
@@ -37,7 +38,8 @@ jobs:
         mkdir licenses
         echo $env:ML_LIC_CONTENT > ${{github.workspace}}/licenses/matlab.lic
         echo $env:BTC_LICENSE > ${{github.workspace}}/licenses/btc.lic
-        docker build -t ep-ml:24.1_23b
+        docker build -t ep-ml:24.1_23b .
+      shell: pwsh
       env:
         ML_LIC_CONTENT: ${{ secrets.ML_LICENSE }}
         EP_LIC_CONTENT: ${{ secrets.BTC_LICENSE }}

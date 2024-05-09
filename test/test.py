@@ -39,7 +39,7 @@ def run_btc_tests(epp_file):
     # Create project report
     report = ep.post(f"scopes/{toplevel_scope_uid}/project-report", message="Creating test report")
     # export project report to a file called 'report.html'
-    ep.post(f"reports/{report['uid']}", { 'exportPath': work_dir, 'newName': 'report' })ˇ
+    ep.post(f"reports/{report['uid']}", { 'exportPath': work_dir, 'newName': 'report' })
 
     # Save *.epp
     ep.put('profiles', { 'path': epp_file }, message="Saving test project")
