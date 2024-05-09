@@ -6,7 +6,7 @@ from importlib import resources
 import yaml
 
 BTC_CONFIG_ENVVAR_NAME = 'BTC_API_CONFIG_FILE'
-BTC_CONFIG_DEFAULTLOCATION = 'C:/ProgramData/BTC/btc_config.yml'
+BTC_CONFIG_DEFAULTLOCATION = 'C:/ProgramData/BTC/ep/btc_config.yml'
 
 def get_global_config():
     config, _ = __get_global_config()

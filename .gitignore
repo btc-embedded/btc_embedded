@@ -8,6 +8,7 @@
 !*.in
 !*.py
 !*.json
+!*.epp
 !*.yml
 !*.cfg
 !*.md
@@ -22,3 +23,6 @@ build/
 dist/
 *.egg-info/
 __pycache__/
+*_rtw/
+slprj/
+*_ep_stubs/
