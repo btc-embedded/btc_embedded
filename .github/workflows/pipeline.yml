@@ -21,10 +21,10 @@ jobs:
         pip install .
 
     - name: Run tests (windows)
+      shell: powershell
       run: |
         .\venv\Scripts\activate
         python test/test.py test/test.epp
-      shell: pwsh
 
   test-docker:
     runs-on: self-hosted
@@ -34,12 +34,12 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Build docker image
+      shell: powershell
       run: |
         mkdir licenses
         echo $env:ML_LIC_CONTENT > ${{github.workspace}}/licenses/matlab.lic
         echo $env:BTC_LICENSE > ${{github.workspace}}/licenses/btc.lic
         docker build -t ep-ml:24.1_23b .
-      shell: pwsh
       env:
         ML_LIC_CONTENT: ${{ secrets.ML_LICENSE }}
         EP_LIC_CONTENT: ${{ secrets.BTC_LICENSE }}
