@@ -83,6 +83,7 @@ RUN sudo chmod +x /tmp/addMLIntegration.bash && sudo /tmp/addMLIntegration.bash 
 
 # install python module btc_embedded
 RUN pip3 install --no-cache-dir btc_embedded
+ENV PYTHONUNBUFFERED 1
 
 # ----------------------------------------------------------------------------------------
 # Optional settings for BTC
