@@ -33,7 +33,6 @@ RUN wget -q https://www.mathworks.com/mpm/glnxa64/mpm && chmod +x mpm \
 # ENV MLM_LICENSE_FILE=27000@matlab.license.server
 ARG ML_LIC_PATH=/licenses/matlab.lic
 ENV MLM_LICENSE_FILE=${ML_LIC_PATH}
-COPY licenses/matlab.lic ${ML_LIC_PATH}
 
 # ----------------------------------------------------------------------------------------
 # BTC EmbeddedPlatform specific configurations
@@ -55,7 +54,6 @@ EXPOSE ${REST_PORT}
 
 ARG LICENSE_LOCATION=/licenses/btc.lic
 ENV LICENSE_LOCATION=${LICENSE_LOCATION}
-COPY licenses/btc.lic ${LICENSE_LOCATION}
 # ARG LICENSE_LOCATION
 # ENV LICENSE_LOCATION=${LICENSE_LOCATION:-27000@srvbtces01.btc-es.local}
 
@@ -103,7 +101,7 @@ ENV PYTHONUNBUFFERED 1
 # [ MATLAB 2023b ]
 USER matlab
 
-# prepare ep cache
-RUN python3 -c "from btc_embedded import EPRestApi;ep=EPRestApi(skip_matlab_start=True);exit()"  && rm ${LOG_DIR}/current.log
+COPY licenses/btc.lic ${LICENSE_LOCATION}
+COPY licenses/matlab.lic ${ML_LIC_PATH}
 
 CMD [ ]

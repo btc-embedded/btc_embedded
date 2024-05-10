@@ -37,9 +37,8 @@ jobs:
       shell: powershell
       run: |
         New-Item -ItemType Directory -Path "${{github.workspace}}/test/licenses" -Force
-        $env:ML_LIC_CONTENT | Out-File -FilePath "${{github.workspace}}/test/licenses/matlab.lic"
-        $env:BTC_LIC_CONTENT | Out-File -FilePath "${{github.workspace}}/test/licenses/btc.lic"
-        Copy-Item -Path "btc_embedded/resources/btc_config.yml" -Destination "test/btc_config.yml"
+        $env:ML_LIC_CONTENT | Out-File -FilePath "${{github.workspace}}/test/licenses/matlab.lic" -Encoding UTF8
+        $env:BTC_LIC_CONTENT | Out-File -FilePath "${{github.workspace}}/test/licenses/btc.lic" -Encoding UTF8
         Copy-Item -Path "btc_embedded/resources/projectreport_templates" -Destination "test/report_templates" -Recurse
         docker build -t ep-ml:24.1_23b test
       env:
@@ -48,11 +47,11 @@ jobs:
 
     - name: Run tests (docker/linux)
       run: |
-        docker run --rm --mac-address 02:42:ac:11:13:37 \
-            --volume "${{github.workspace}}/licenses:/licenses"
-            --volume "${{github.workspace}}:${{github.workspace}}"
-            --workdir "${{github.workspace}}" \
-            ep-ml:24.1_23b \
+        docker run --rm --mac-address 02:42:ac:11:13:37 `
+            --volume "${{github.workspace}}/licenses:/licenses" `
+            --volume "${{github.workspace}}:/workdir" `
+            --workdir "/workdir" `
+            ep-ml:24.1_23b `
             "pip install . && python test/test.py test/test.epp"
 
   deploy:
