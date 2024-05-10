@@ -16,6 +16,7 @@
 !*.template
 !Dockerfile
 !.gitignore
+!*.bash
 
 .idea/
 .pypirc
