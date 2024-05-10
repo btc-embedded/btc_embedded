@@ -11,7 +11,7 @@ jobs:
     if: ${{ contains(github.event.head_commit.message, '#test-windows') }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout
 
     - name: Install rc
       run: |
@@ -31,7 +31,7 @@ jobs:
     if: ${{ contains(github.event.head_commit.message, '#test-docker') }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout
 
     - name: Build docker image
       shell: powershell
@@ -54,15 +54,14 @@ jobs:
             sh -c "pip3 install . && python3 test/test.py test/test.epp"
 
   deploy:
-    needs: [test-windows, test-docker]
     runs-on: ubuntu-latest
     if: ${{ contains(github.event.head_commit.message, '#deploy') }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout
         
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python
       with:
         python-version: '3.12'
 
