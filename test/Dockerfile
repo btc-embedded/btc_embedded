@@ -79,8 +79,6 @@ COPY --chown=1000 report_templates /home/matlab/Documents/report_templates
 COPY --chown=1000 addMLIntegration.bash /tmp/
 RUN sudo chmod +x /tmp/addMLIntegration.bash && sudo /tmp/addMLIntegration.bash && sudo rm /tmp/addMLIntegration.bash
 
-# install python module btc_embedded
-RUN pip3 install --no-cache-dir btc_embedded
 ENV PYTHONUNBUFFERED 1
 
 # ----------------------------------------------------------------------------------------

@@ -48,11 +48,10 @@ jobs:
     - name: Run tests (docker/linux)
       run: |
         docker run --rm --mac-address 02:42:ac:11:13:37 `
-            --volume "${{github.workspace}}/licenses:/licenses" `
             --volume "${{github.workspace}}:/workdir" `
             --workdir "/workdir" `
             ep-ml:24.1_23b `
-            "pip install . && python test/test.py test/test.epp"
+            sh -c "pip3 install . && python3 test/test.py test/test.epp"
 
   deploy:
     needs: [test-windows, test-docker]
