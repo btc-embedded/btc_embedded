@@ -30,7 +30,7 @@ def install_btc_config():
     if os.path.exists(BTC_CONFIG_DEFAULTLOCATION):
         return
     else:
-        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\BTC")
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\BTC", access=winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
         ep_version = None
         for subkey_name in _get_subkeys(key):
             if subkey_name.startswith("EmbeddedPlatform"):

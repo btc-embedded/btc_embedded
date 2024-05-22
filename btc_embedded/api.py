@@ -337,7 +337,7 @@ class EPRestApi:
         for key in keys:
             try:
                 # Attempt to open the registry key
-                reg_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, rf'SOFTWARE\BTC\EmbeddedPlatform {version}\Addons\{key}')
+                reg_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, rf'SOFTWARE\BTC\EmbeddedPlatform {version}\Addons\{key}', access=winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
                 winreg.CloseKey(reg_key)
                 return True
             except OSError:
