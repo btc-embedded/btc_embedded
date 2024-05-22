@@ -49,3 +49,29 @@ Windows
 - As the value of the property licenseLocation in the global or project-specific btc_config.yml
 - As the value of the constructor argument license_location when creating the EPRestApi() object in Python
 - As the value of the registry key called OSCCSD_LICENSE_FILE in "HKEY_CURRENT_USER/SOFTWARE/FLEXlm License Manager" (automatically set when using the license dialog of the GUI)
+
+## Reporting
+
+### Project Report & Templates
+- When creating the project report the user can add the name of a report template by appending '?template-name=rbt-ec' to the API call
+- This expects a report template xml file to be present in the report templates directory which is indicated by the preference REPORT_TEMPLATE_FOLDER (part of the btc_config.yml)
+- If the user didn’t configure it differently, some default templates are automatically placed into “C:/ProgramData/BTC/ep/report-templates”
+    - rbt-b2b-ec.xml
+    - rbt-b2b-tl.xml
+    - rbt-ec.xml
+    - rbt-sil-only.xml
+    - rbt-tl.xml
+    - b2b-only-ec.xml
+    - b2b-only-tl.xml
+    - regression-test-ec.xml
+    - regression-test-sil-only.xml
+    - regression-test-tl.xml
+- Users can create report templates according to their own needs via the GUI, save them in the report template folder and refer to them by name when creating a project report.
+
+
+## BTC Summary Report
+
+- When testing multiple projects in batch it’s helpful to have a summary report that lists all project, their overall status and allows to drill down into the respective project reports.
+- Two things are needed to achieve this:
+1. For each individual project (e.g., a workflow that works on one model/epp), a result object must be created (see https://github.com/btc-embedded/btc-ci-workflow/blob/main/examples/btc_test_workflow.py#L58).
+2. The result objects for each project needs to be added to a list and this list will then be passed used for creating the report (see https://github.com/btc-embedded/btc-ci-workflow/blob/main/examples/test_multiple_projects.py)
