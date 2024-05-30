@@ -272,6 +272,9 @@ class EPRestApi:
                     if not (template_folder and os.path.isdir(template_folder)):
                         install_report_templates(template_folder)
                     preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': template_folder })
+                elif pref_key == 'ARCHITECTURE_EC_CUSTOM_USER_CONFIGURATION_FOLDER':
+                    ec_cfg_folder  = self._rel_to_abs(config['preferences'][pref_key])
+                    preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': ec_cfg_folder })
                 # all other cases
                 else:
                     preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': config['preferences'][pref_key] })

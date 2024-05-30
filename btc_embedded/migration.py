@@ -58,7 +58,7 @@ def migration_suite_target(models, matlab_version, model_results=None, accept_in
     create_test_report_summary(results, 'BTC Migration Test Suite', 'BTCMigrationTestSuite.html', 'results')
     return model_results
 
-def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=None, model_results=None):
+def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=None, model_results=None, export_executions=False):
     """Generates tests for full coverage on the given model using the
     specified Matlab version, then performs a MIL and SIL simulation
     to record the reference behavior.
@@ -91,7 +91,7 @@ def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=No
         return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
 
     # Simulation
-    step_result = src_04_reference_simulation(ep, toplevel_uid, test_mil, step_results)
+    step_result = src_04_reference_simulation(ep, toplevel_uid, test_mil, export_executions, result_dir, step_results)
     if step_result and step_result['status'] == 'ERROR':
         return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
 
@@ -122,24 +122,30 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     script_path = os.path.abspath(new_model['script']) if 'script' in new_model and new_model['script'] else None
     result_dir = os.path.abspath('results')
     message_report_file = quote(os.path.join(result_dir, f'{model_name}_messages.html'))
+    step_results = model_results[model_name] if model_results else []
+    reference_executions_dir = step_results[:-1]['erDir']
     if epp_file:
         epp_rel_path = None
         if os.path.realpath(result_dir) in os.path.realpath(epp_file):
             epp_rel_path = os.path.realpath(epp_file).replace(os.path.realpath(result_dir), '')
             while epp_rel_path.startswith(os.sep): epp_rel_path = epp_rel_path[1:]
     else:
-        epp_file, epp_rel_path = get_epp_file_by_name(result_dir, model_path)
-    step_results = model_results[model_name] if model_results else []
+        epp_name_suffix = ('_target' if reference_executions_dir else '')
+        epp_file, epp_rel_path = get_epp_file_by_name(result_dir, model_path, suffix=epp_name_suffix)
     
     # start ep or use provided api object
     ep, step_result = src_01_start_ep(ep_api_object, matlab_version, step_results)
     if step_result and step_result['status'] == 'ERROR':
         return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
     
-    # load BTC EmbeddedPlatform profile (*.epp), update architecture and check for interface changes
-    toplevel_uid, step_result = tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, model_name, accept_interface_changes, matlab_version, step_results)
-    if step_result and step_result['status'] == 'ERROR':
-        return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
+    if reference_executions_dir:
+        # create profile and import reference execution records
+        toplevel_uid, step_result = tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, matlab_version, reference_executions_dir, test_mil, step_results)
+    else:
+        # load BTC EmbeddedPlatform profile (*.epp), update architecture and check for interface changes
+        toplevel_uid, step_result = tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, model_name, accept_interface_changes, matlab_version, step_results)
+        if step_result and step_result['status'] == 'ERROR':
+            return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
 
     # Regression Test (SIL)
     sil_test, step_result = tgt_06_regression_test_sil(ep, step_results)
@@ -242,7 +248,7 @@ def src_03_generate_vectors(ep, toplevel_uid, results):
     results.append(step_result)
     return step_result
 
-def src_04_reference_simulation(ep, toplevel_uid, test_mil, results):
+def src_04_reference_simulation(ep, toplevel_uid, test_mil, export_executions, result_dir, results):
     try:
         mil_sil_configs = ep.get('execution-configs')['execConfigNames']
         step_result = { 'stepName' : 'Reference Simulation' }
@@ -258,6 +264,10 @@ def src_04_reference_simulation(ep, toplevel_uid, test_mil, results):
         old_sil_folder = ep.post('folders', payload)
         sil_execution_records_uids = [ er['uid'] for er in all_execution_records if er['executionConfig'] == 'SIL']
         ep.put(f"folders/{old_sil_folder['uid']}/execution-records", { 'UIDs' : sil_execution_records_uids })
+        # export to directory
+        if export_executions:
+            sil_er_dir = os.path.join(result_dir, 'ER', 'SIL')
+            ep.post('execution-records-export', { 'UIDs' : sil_execution_records_uids, 'exportDirectory': sil_er_dir })
 
         # MIL
         if test_mil:
@@ -266,7 +276,13 @@ def src_04_reference_simulation(ep, toplevel_uid, test_mil, results):
             mil_execution_config = next(cfg for cfg in mil_sil_configs if 'MIL' in cfg)
             mil_execution_records_uids = [ er['uid'] for er in all_execution_records if er['executionConfig'] == mil_execution_config]
             ep.put(f"folders/{old_mil_folder['uid']}/execution-records", { 'UIDs' : mil_execution_records_uids })
+            
+            # export to directory
+            if export_executions:
+                mil_er_dir = os.path.join(result_dir, 'ER', 'MIL')
+                ep.post('execution-records-export', { 'UIDs' : mil_execution_records_uids, 'exportDirectory': mil_er_dir })
 
+        step_result['erDir'] = os.path.join(result_dir, 'ER')
         step_result['status'] = 'PASSED'
     except Exception as e:
         handle_error(ep, step_result)
@@ -315,6 +331,57 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, mod
             warning = f"[WARNING] {msg}\n{hint}"
             print(warning)
             if not accept_interface_changes: raise Exception(warning)
+        step_result['status'] = 'PASSED'
+    except Exception as e:
+        handle_error(ep, step_result)
+    results.append(step_result)
+    return toplevel_uid, step_result
+
+def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, matlab_version, reference_executions_dir, test_mil, results):
+    try:
+        step_result = { 'stepName' : 'Target Profile & Ref Executions Import' }
+        ep.post('profiles?discardCurrentProfile=true')
+
+        # perform architecture import based on codegen type
+        message=f"Importing {model_name}  with Matlab R{matlab_version}"
+        codegen_type = util.determine_codegen_type(ep, model_path)
+        if codegen_type == 'EC':
+            payload = {
+                'ecModelFile' : model_path,
+                'ecInitScript' : script_path
+            } 
+            ep.post('architectures/embedded-coder', payload, message=message)
+        elif codegen_type == 'TL':
+            payload = {
+                'tlModelFile' : model_path,
+                'tlInitScript' : script_path
+            } 
+            ep.post('architectures/targetlink', payload, message=message)
+        else:
+            raise Exception('Unsupported code generation config.')
+
+        # import reference executions
+        mil_executions, sil_executions = get_existing_references(reference_executions_dir)
+        # SIL
+        if sil_executions:
+            payload = {'folderKind': 'EXECUTION_RECORD', 'folderName' : 'old-sil' }
+            old_sil_folder = ep.post('folders', payload)
+            payload = { 'paths' : sil_executions, 'kind' : 'SIL', 'folderUID' : old_sil_folder['uid']}
+            ep.post('execution-records', payload, message='Importing SIL reference executions')
+
+        # MIL
+        if test_mil and mil_executions:
+            # get mil config (can be TL MIL or SL MIL)
+            mil_config = next(cfg for cfg in ep.get('execution-configs')['execConfigNames'] if 'MIL' in cfg)
+            payload = {'folderKind': 'EXECUTION_RECORD', 'folderName' : 'old-mil' }
+            old_mil_folder = ep.post('folders', payload)
+            payload = { 'paths' : mil_executions, 'kind' : mil_config, 'folderUID' : old_mil_folder['uid']}
+            ep.post('execution-records', payload, message='Importing MIL reference executions')
+        
+        # saving target profile
+        ep.put('profiles', { 'path': epp_file })
+
+        toplevel_uid = ep.get('scopes')[0]['uid']
         step_result['status'] = 'PASSED'
     except Exception as e:
         handle_error(ep, step_result)
@@ -401,8 +468,8 @@ def start_ep_and_configure_matlab(version):
     ep.put('preferences', [ {'preferenceName' : 'GENERAL_MATLAB_CUSTOM_VERSION', 'preferenceValue' : f'MATLAB R{version} (64-bit)' }, { 'preferenceName' : 'GENERAL_MATLAB_VERSION', 'preferenceValue': 'CUSTOM' } ])
     return ep
 
-def get_epp_file_by_name(result_dir, model_path):
-    model_name = os.path.basename(model_path)[:-4].replace('Wrapper_', '')
+def get_epp_file_by_name(result_dir, model_path, suffix=''):
+    model_name = os.path.basename(model_path)[:-4].replace('Wrapper_', '') + suffix
     return os.path.join(result_dir, model_name + '.epp'), model_name + '.epp'
 
 def select_report_template(ep, test_mil):

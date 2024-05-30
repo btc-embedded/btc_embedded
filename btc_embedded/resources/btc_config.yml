@@ -40,6 +40,7 @@ preferences:
   # settings for EmbeddedCoder Architecture Update
   EC_ARCHITECTURE_UPDATE_CODE_META_SOURCE: MODEL_ANALYSIS
   EC_ARCHITECTURE_UPDATE_MAPPING_SOURCE: PROFILE
+  # ARCHITECTURE_EC_CUSTOM_USER_CONFIGURATION_FOLDER: my-ec-user-config-folder
 
 # Additionally, you can specify arbitrary key-value pairs to use them in your scripts
 # The goal is to separate any configuration from the code, so you can adapt your

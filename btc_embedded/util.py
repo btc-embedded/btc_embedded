@@ -40,19 +40,34 @@ def determine_codegen_type(ep, model_file):
         temp_dir = os.path.join(os.path.dirname(slx_file), "_tmpmodelcontent")
         os.makedirs(temp_dir, exist_ok=True)
 
-        # Extract the .slx file into the temporary directory
-        with zipfile.ZipFile(slx_file, 'r') as zip_ref:
-            zip_ref.extractall(temp_dir)
+        if slx_file.endswith('.slx'):
+            # Extract the .slx file into the temporary directory
+            with zipfile.ZipFile(slx_file, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+        elif slx_file.endswith('.mdl'):
+            shutil.copyfile(slx_file, os.path.join(temp_dir, 'model.mdl'))
+        else:
+            raise Exception("Unsupported model type: " + slx_file[:-4])
 
         return temp_dir
     
     def check_tl(temp_dir):
-        tl_file = os.path.join(temp_dir, 'simulink/systems/system_root.xml')
-        tl_string  = '<P Name="SourceBlock">tllib/TargetLink Main Dialog</P>'
+        # pick the right file to analyze (slx vs. mdl)
+        if os.path.isfile(os.path.join(temp_dir, 'simulink/systems/system_root.xml')):
+            tl_file = os.path.join(temp_dir, 'simulink/systems/system_root.xml')
+        elif os.path.isfile(os.path.join(temp_dir, 'model.mdl')):
+            tl_file = os.path.join(temp_dir, 'model.mdl')
+        else:
+            return False
+
+        # search for 'tllib/TargetLink Main Dialog' string in file
+        tl_string  = 'tllib/TargetLink Main Dialog'
         with open(tl_file, 'r') as file:
             for line in file:
                 if tl_string in line:
                     return True
+        
+        # no TargetLink main dialog found
         return False
 
 # --> this check leaves the model in a broken state, would at least need to call close_system
