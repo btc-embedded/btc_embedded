@@ -38,28 +38,32 @@ class EPRestApi:
         self._HOST_ = host
         self.definitively_closed = False
         self.actively_started = False
+        self.ep_process = None
+        self.config = None
         # use default config, if no config was specified
-        if not config:
+        if config:
+            self.config = config
+        else:
             if platform.system() == 'Windows' and self._is_localhost() and not skip_config_install:
                 install_btc_config()
-            config = get_global_config()
+            self.config = get_global_config()
         # apply timeout from config if specified
-        if 'startupTimeout' in config: timeout = config['startupTimeout']
+        if 'startupTimeout' in self.config: timeout = self.config['startupTimeout']
         # set install location based on install_root and version if set explicitly
         if version and install_root: install_location = f"{install_root}/ep{version}"
         if install_location and not version:
             match = re.search(VERSION_PATTERN, install_location)
             if match: version = match.group(1)
         # fallback: determine based on config
-        if not (version and install_location) and 'installationRoot' in config and 'epVersion' in config:
-            version = config['epVersion']
-            install_location = f"{config['installationRoot']}/ep{config['epVersion']}"
+        if not (version and install_location) and 'installationRoot' in self.config and 'epVersion' in self.config:
+            version = version or self.config['epVersion']
+            install_location = f"{self.config['installationRoot']}/ep{version}"
         if not self._is_rest_service_available():
-            if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, config)
+            if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic)
             elif platform.system() == 'Linux': self._start_app_linux(skip_matlab_start)
         else:
             print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
-            self._apply_preferences(config)
+            self._apply_preferences()
             return
         start_time = time.time()
         print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
@@ -73,7 +77,7 @@ class EPRestApi:
             time.sleep(2)
             print('.', end='')
         print('\nBTC EmbeddedPlatform has started.')
-        self._apply_preferences(config)
+        self._apply_preferences()
 
     # - - - - - - - - - - - - - - - - - - - - 
     #   PUBLIC FUNCTIONS
@@ -83,13 +87,14 @@ class EPRestApi:
     def close_application(self):
         self.delete('application?force-quit=true')
         start_time = time.time()
-        while self._is_rest_service_available():
-            if (time.time() - start_time) > 10:
-                # kill by PID if it didn't close within 10s
-                os.kill(self.ep_process, signal.SIGKILL)
-            else:
-                time.sleep(2)
-        self.definitively_closed = True
+        if self.ep_process:
+            while self._is_rest_service_available():
+                if (time.time() - start_time) > 10:
+                    # kill by PID if it didn't close within 10s
+                    os.kill(self.ep_process, signal.SIGKILL)
+                else:
+                    time.sleep(2)
+            self.definitively_closed = True
 
     # wrapper directly returns the relevant object if possible
     def get(self, urlappendix, message=None):
@@ -124,7 +129,7 @@ class EPRestApi:
         For Linux/Docker based scenarios, the config has no effect."""
         try:
             if not value and not (config and 'compiler' in config):
-                config = get_global_config()
+                config = self.config
                 value = config['compiler']
             if platform.system() == 'Windows':
                 preferences = [ { 'preferenceName' : 'GENERAL_COMPILER_SETTING', 'preferenceValue' : value } ]
@@ -254,9 +259,9 @@ class EPRestApi:
     def _poll_long_running(self, jobID):
         return self.get_req('/progress?progress-id=' + jobID)
 
-
-    def _apply_preferences(self, config):
+    def _apply_preferences(self):
         """Applies the preferences defined in the config object"""
+        config = self.config
         if config and 'preferences' in config:
             preferences = []
             for pref_key in list(config['preferences'].keys()):
@@ -391,7 +396,7 @@ class EPRestApi:
             _, secondary_pty = pty.openpty()
             subprocess.Popen('matlab', stdin=secondary_pty)
 
-    def _start_app_windows(self, version, install_location, port, license_location, lic, config):
+    def _start_app_windows(self, version, install_location, port, license_location, lic):
         headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
         # check if we have what we need
         if not (version and install_location): raise Exception("Cannot start BTC EmbeddedPlatform. Arguments version and install_location or install_root directory must be specified or configured in a config file (installationRoot)")
@@ -424,11 +429,17 @@ class EPRestApi:
             ' -Dep.runtime.workdir=BTC/ep/' + version + '/' + self._PORT_ + \
             ' -Dep.licensing.package=' + lic + \
             ' -Dep.rest.port=' + self._PORT_
-        if license_location or config and 'licenseLocation' in config:
-                args += f" -Dep.licensing.location={(license_location or config['licenseLocation'])}"
+        if license_location or self.config and 'licenseLocation' in self.config:
+                args += f" -Dep.licensing.location={(license_location or self.config['licenseLocation'])}"
         self.ep_process = subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
         self.log_file_path = appdata_location + self._PORT_ + '/logs/current.log'
         self.actively_started = True
+
+    def _does_api_support_signalinfo(self):
+        # check if the current EP version supports querying signal info details
+        r = requests.get(self._url('signals/UNDEFINED/signal-datatype-information'))
+        api_call_supported = (b'No signal' in r.content)
+        return api_call_supported
 
     def _is_ep_process_still_alive(self):
         return self.ep_process.poll() is None

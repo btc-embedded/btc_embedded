@@ -6,13 +6,14 @@ from urllib.parse import quote
 
 import btc_embedded.util as util
 from btc_embedded.api import EPRestApi
+from btc_embedded.helpers import apply_tolerances_from_config
 from btc_embedded.reporting import create_test_report_summary
 
 tmp = {}
 source_version = None
 message_report_file = None
 
-def migration_suite_source(models, matlab_version, toolchain_script=None):
+def migration_suite_source(models, matlab_version, toolchain_script=None, test_mil=False, export_executions=False, reuse_code=False, ep=None):
     """For each of the given models this function generates tests for
     full coverage on the given model using the specified Matlab version,
     then performs a MIL and SIL simulation to record the reference behavior."""
@@ -23,19 +24,24 @@ def migration_suite_source(models, matlab_version, toolchain_script=None):
     shutil.rmtree('results', ignore_errors=True)
     
     # start ep, connect to selected matlab version and run toolchain script
-    ep = start_ep_and_configure_matlab(matlab_version)
+    ep = start_ep_and_configure_matlab(matlab_version, ep)
     if toolchain_script: # evaluate toolchain script in the base workspace
-        ep.post('execute-long-matlab-script', {'scriptName' : 'evalin', 'inArgs' : [ 'base', toolchain_script ]})
+        ep.post('execute-long-matlab-script', {'scriptName' : 'evalin', 'inArgs' : [ 'base', f"run('{toolchain_script}')" ]}, message=f"Evaluating toolchain script '{toolchain_script}' in Matlab base workspace.")
 
     # run migration source part for all models
     model_results = {}
     for old_model in models:
-        migration_source(old_model, matlab_version, ep_api_object=ep, model_results=model_results)
+        migration_source(old_model, matlab_version,
+            ep_api_object=ep,
+            model_results=model_results,
+            test_mil=test_mil,
+            export_executions=export_executions,
+            reuse_code=reuse_code)
 
     ep.close_application()
     return model_results
 
-def migration_suite_target(models, matlab_version, model_results=None, accept_interface_changes=False, toolchain_script=None):
+def migration_suite_target(models, matlab_version, model_results=None, accept_interface_changes=False, test_mil=False, toolchain_script=None, reuse_code=False,ep=None):
     """For each of the given models this function
     imports the reference execution records and simulates the same
     vectors on MIL and SIL based on the specified Matlab version. This
@@ -44,13 +50,18 @@ def migration_suite_target(models, matlab_version, model_results=None, accept_in
     results = []
 
     # start ep, connect to selected matlab version and run toolchain script
-    ep = start_ep_and_configure_matlab(matlab_version)
+    ep = start_ep_and_configure_matlab(matlab_version, ep)
     if toolchain_script: # evaluate toolchain script in the base workspace
         ep.post('execute-long-matlab-script', {'scriptName' : 'evalin', 'inArgs' : [ 'base', toolchain_script ]})
 
     # run migration target part for all models and collect results
     for new_model in models:
-        result = migration_target(new_model, matlab_version, ep_api_object=ep, model_results=model_results, accept_interface_changes=accept_interface_changes)
+        result = migration_target(new_model, matlab_version,
+            ep_api_object=ep,
+            model_results=model_results,
+            accept_interface_changes=accept_interface_changes,
+            test_mil=test_mil,
+            reuse_code=reuse_code)
         results.append(result)
 
     # close application and create summary report
@@ -58,7 +69,7 @@ def migration_suite_target(models, matlab_version, model_results=None, accept_in
     create_test_report_summary(results, 'BTC Migration Test Suite', 'BTCMigrationTestSuite.html', 'results')
     return model_results
 
-def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=None, model_results=None, export_executions=False):
+def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=None, model_results=None, export_executions=False, reuse_code=False):
     """Generates tests for full coverage on the given model using the
     specified Matlab version, then performs a MIL and SIL simulation
     to record the reference behavior.
@@ -72,7 +83,7 @@ def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=No
     model_name = os.path.basename(model_path)[:-4].replace('Wrapper_', '')
     script_path = os.path.abspath(old_model['script']) if 'script' in old_model and old_model['script'] else None
     result_dir = os.path.abspath('results')
-    message_report_file = quote(os.path.join(result_dir, f'{model_name}_messages.html'))
+    message_report_file = os.path.join(result_dir, f'{model_name}_messages.html')
     epp_file, epp_rel_path = get_epp_file_by_name(result_dir, model_path)
     
     # start ep or use provided api object
@@ -81,7 +92,7 @@ def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=No
         return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
     
     # Empty BTC EmbeddedPlatform profile (*.epp) + Arch Import
-    toplevel_uid, step_result = src_02_import_model(ep, model_path, script_path, model_name, matlab_version, step_results)
+    toplevel_uid, step_result = src_02_import_model(ep, model_path, script_path, model_name, matlab_version, reuse_code, step_results)
     if step_result and step_result['status'] == 'ERROR':
         return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
 
@@ -107,7 +118,7 @@ def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=No
 
     return epp_file
 
-def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=None, epp_file=None, accept_interface_changes=False, model_results=None):
+def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=None, epp_file=None, accept_interface_changes=False, model_results=None, reuse_code=False):
     """Imports the reference execution records and simulates the same
     vectors on MIL and SIL based on the specified Matlab version. This
     regression test will show any changed behavior compared to the provided 
@@ -123,7 +134,10 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     result_dir = os.path.abspath('results')
     message_report_file = quote(os.path.join(result_dir, f'{model_name}_messages.html'))
     step_results = model_results[model_name] if model_results else []
-    reference_executions_dir = step_results[:-1]['erDir']
+    if step_results and 'erDir' in step_results[-1]:
+        reference_executions_dir = step_results[-1]['erDir']
+    else:
+        reference_executions_dir = None
     if epp_file:
         epp_rel_path = None
         if os.path.realpath(result_dir) in os.path.realpath(epp_file):
@@ -140,12 +154,17 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     
     if reference_executions_dir:
         # create profile and import reference execution records
-        toplevel_uid, step_result = tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, matlab_version, reference_executions_dir, test_mil, step_results)
+        toplevel_uid, step_result = tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, matlab_version, reference_executions_dir, test_mil, reuse_code, step_results)
     else:
         # load BTC EmbeddedPlatform profile (*.epp), update architecture and check for interface changes
         toplevel_uid, step_result = tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, model_name, accept_interface_changes, matlab_version, step_results)
         if step_result and step_result['status'] == 'ERROR':
             return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
+
+    # Tolerances
+    step_result = tgt_06_tolerances(ep, step_results)
+    if step_result and step_result['status'] == 'ERROR':
+        return get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, error_message=step_result['message'])
 
     # Regression Test (SIL)
     sil_test, step_result = tgt_06_regression_test_sil(ep, step_results)
@@ -198,14 +217,14 @@ def src_01_start_ep(ep_api_object, matlab_version, results):
     else:
         try:
             step_result = { 'stepName' : 'BTC Startup' }
-            ep = start_ep_and_configure_matlab(matlab_version)
+            ep = start_ep_and_configure_matlab(matlab_version, ep_api_object)
             step_result['status'] = 'PASSED'
         except Exception as e:
             handle_error(ep, step_result)
     results.append(step_result)
     return ep, step_result
 
-def src_02_import_model(ep, model_path, script_path, model_name, matlab_version, results):
+def src_02_import_model(ep, model_path, script_path, model_name, matlab_version, reuse_code, results):
     try:
         step_result = { 'stepName' : 'Import Model' }
         toplevel_uid = None
@@ -218,13 +237,20 @@ def src_02_import_model(ep, model_path, script_path, model_name, matlab_version,
             payload = {
                 'ecModelFile' : model_path,
                 'ecInitScript' : script_path
-            } 
+            }
+            if reuse_code:
+                payload['useExistingCode'] = True
             ep.post('architectures/embedded-coder', payload, message=message)
         elif codegen_type == 'TL':
             payload = {
                 'tlModelFile' : model_path,
                 'tlInitScript' : script_path
             } 
+            legacy_code_xml = os.path.join(os.path.dirname(model_path), 'LegacyCode.xml')
+            if os.path.isfile(legacy_code_xml):
+                payload['environment'] = legacy_code_xml
+            if reuse_code:
+                payload['useExistingCode'] = True
             ep.post('architectures/targetlink', payload, message=message)
         else:
             raise Exception('Unsupported code generation config.')
@@ -239,7 +265,19 @@ def src_02_import_model(ep, model_path, script_path, model_name, matlab_version,
 def src_03_generate_vectors(ep, toplevel_uid, results):
     try:
         step_result = { 'stepName' : 'Generate Vectors' }
-        ep.post('coverage-generation', { 'scopeUid' : toplevel_uid, 'pllString': 'MCDC' }, message="Generating vectors")
+        vector_gen_settings = {
+            'scopeUid' : toplevel_uid,
+            'pllString': 'MCDC',
+            'engineSettings' : {
+                'timeoutSeconds': 300,
+                'engineAtg' : { 'timeoutSecondsPerSubsystem' : 15 },
+                'engineCv' : {
+                    'coreEngines' : [ { 'name' : 'ISAT' }, { 'name' : 'CBMC' }] ,
+                    'maximumNumberOfThreads' : 2
+                }
+            }
+        }
+        ep.post('coverage-generation', vector_gen_settings, message="Generating vectors")
         b2b_coverage = ep.get(f"scopes/{toplevel_uid}/coverage-results-b2b")
         print('Coverage ' + "{:.2f}%".format(b2b_coverage['MCDCPropertyCoverage']['handledPercentage']))
         step_result['status'] = 'PASSED'
@@ -337,7 +375,7 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, mod
     results.append(step_result)
     return toplevel_uid, step_result
 
-def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, matlab_version, reference_executions_dir, test_mil, results):
+def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, matlab_version, reference_executions_dir, test_mil, reuse_code, results):
     try:
         step_result = { 'stepName' : 'Target Profile & Ref Executions Import' }
         ep.post('profiles?discardCurrentProfile=true')
@@ -349,13 +387,17 @@ def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, 
             payload = {
                 'ecModelFile' : model_path,
                 'ecInitScript' : script_path
-            } 
+            }
+            if reuse_code:
+                payload['useExistingCode'] = True
             ep.post('architectures/embedded-coder', payload, message=message)
         elif codegen_type == 'TL':
             payload = {
                 'tlModelFile' : model_path,
                 'tlInitScript' : script_path
             } 
+            if reuse_code:
+                payload['useExistingCode'] = True
             ep.post('architectures/targetlink', payload, message=message)
         else:
             raise Exception('Unsupported code generation config.')
@@ -387,6 +429,16 @@ def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, 
         handle_error(ep, step_result)
     results.append(step_result)
     return toplevel_uid, step_result
+
+def tgt_06_tolerances(ep, results):
+    try:
+        step_result = { 'stepName' : 'Default Tolerances' }
+        tolerance_definition_found = apply_tolerances_from_config(ep)
+        step_result['status'] = 'PASSED' if tolerance_definition_found else 'SKIPPED'
+    except Exception as e:
+        handle_error(ep, step_result)
+    results.append(step_result)
+    return step_result
 
 def tgt_06_regression_test_sil(ep, results):
     try:
@@ -461,10 +513,11 @@ def handle_error(ep, step_result, epp_file=None):
     if epp_file: ep.put('profiles', { 'path': epp_file }, message="Saving profile after error")
     # export messages to {model_name}_messages.html
     global message_report_file
-    ep.post(f'messages/message-report?file-name={message_report_file}&marker-date={ep.message_marker_date}')
+    os.makedirs(os.path.dirname(message_report_file), exist_ok=True)
+    ep.post(f'messages/message-report?file-name={quote(message_report_file, safe="")}&marker-date={ep.message_marker_date}')
 
-def start_ep_and_configure_matlab(version):
-    ep = EPRestApi()
+def start_ep_and_configure_matlab(version, ep):
+    if not ep: ep = EPRestApi()
     ep.put('preferences', [ {'preferenceName' : 'GENERAL_MATLAB_CUSTOM_VERSION', 'preferenceValue' : f'MATLAB R{version} (64-bit)' }, { 'preferenceName' : 'GENERAL_MATLAB_VERSION', 'preferenceValue': 'CUSTOM' } ])
     return ep
 

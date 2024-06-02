@@ -29,18 +29,20 @@ preferences:
   GENERAL_COMPILER_SETTING: (Internal) MinGW64 (64bit)
   SIMULATION_MIL_NUMBER_OF_MATLAB_INSTANCES: 1
   REPORT_TEMPLATE_FOLDER: report-templates
-  # vector generation settings
-  SV_GEN_HEURISTIC: ATG+CV
-  SV_GEN_CV_PARALLEL_ENGINE_MODE: BALANCED
-  SV_GEN_CV_ENGINES: SMIBMC:0,VIS:0,AUTOFXP:0,CBMC:1,ISAT:1
-  SV_GEN_ATG_TIMEOUT_SCOPE: 15                              # atg-timeout per scope
-  SV_GEN_CV_TIMEOUT_PROPERTY: 20                            # cv-timeout per property
-  SV_GEN_GLOBAL_TIMEOUT: 180                                # global timeout
-  SV_GEN_HIERARCHICALLY: false                              # only generate on entrypoint function
   # settings for EmbeddedCoder Architecture Update
   EC_ARCHITECTURE_UPDATE_CODE_META_SOURCE: MODEL_ANALYSIS
   EC_ARCHITECTURE_UPDATE_MAPPING_SOURCE: PROFILE
   # ARCHITECTURE_EC_CUSTOM_USER_CONFIGURATION_FOLDER: my-ec-user-config-folder
+
+# Tolerances can be defined for RBT (requirements-based tests) and B2B (back-to-back & regression tests)
+# Tolerances defined here will automatically be applied (supported with EP 24.1 and beyond)
+# default_tolerances:
+#   B2B: 
+#     floating-point:
+#       abs: '0.001'
+#       rel: '0.01'
+#     fixed-point: # integers with LSB < 1
+#       abs: '1*LSB'
 
 # Additionally, you can specify arbitrary key-value pairs to use them in your scripts
 # The goal is to separate any configuration from the code, so you can adapt your
