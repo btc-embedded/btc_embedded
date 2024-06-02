@@ -36,6 +36,7 @@ Windows
     - https://github.com/btc-embedded/btc_embedded/blob/main/btc_embedded/resources/btc_config.yml
     - https://github.com/btc-embedded/btc-ci-workflow/blob/main/btc_config.yml
 - Some report templates are also added and can be used when creating a project report
+- Default tolerances for requirements-based testing and back-to-back testing can be specified as part of the btc_config.yml file for BTC EmbeddedPlatform versions 24.1 and higher (see comments in [btc_config.yml](https://github.com/btc-embedded/btc_embedded/blob/main/btc_embedded/resources/btc_config.yml) for more details)
 
 ## Docker/Linux
 - the config & the env variable are part of the build
