@@ -57,14 +57,17 @@ For each scope, for each DISP/OUT the signal is checked:
      useful for floats to compensate for low precision on high float values
 
 ```yaml
-default_tolerances:
+tolerances:
   B2B: 
+    # specific tolerances for matching signals
     signal-name-based:
       - regex: .*_write.*
         rel: 2e-1
       - regex: .*dsout_.*
         abs: 4e-6
         rel: 4e-4
+
+    # default tolerances for anything else
     floating-point:
       abs: 0.001
       rel: 0.01
