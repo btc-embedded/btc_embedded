@@ -125,11 +125,11 @@ rel: relative tolerance - accepted deviation <= (reference value * rel) will be 
      useful for floats to compensate for low precision on high float values
     """
     config = ep.config
-    if config and 'default_tolerances' in config and ep._does_api_support_signalinfo():
+    if config and 'tolerances' in config and ep._does_api_support_signalinfo():
         tolerance_definition_found = True
         for use_case in [ 'RBT', 'B2B' ]:
-            if use_case in config['default_tolerances']:
-                tol_b2b = config['default_tolerances'][use_case]
+            if use_case in config['tolerances']:
+                tol_b2b = config['tolerances'][use_case]
                 tolerances_flp = tol_b2b['floating-point'] if 'floating-point' in tol_b2b else None
                 tolerances_fxp = tol_b2b['fixed-point'] if 'fixed-point' in tol_b2b else None
                 tolerances_regex = tol_b2b['signal-name-based'] if 'signal-name-based' in tol_b2b else None
@@ -198,7 +198,7 @@ def _collect_scope_signal_data(ep, tol_fxp, tol_flp, tol_regex):
 
     return xml_subsystems
 
-def _generate_tolerance_xml(subsystems, tolerance_xml_file='default_tolerances.xml'):
+def _generate_tolerance_xml(subsystems, tolerance_xml_file='tolerances.xml'):
     # templates for substitution
     xml_template = """<?xml version="1.0" encoding="UTF-8"?>
 <ToleranceSettings version="1.1">

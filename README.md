@@ -44,7 +44,7 @@ When configured in the config, they will automatically be applied to the test pr
 For each scope, for each DISP/OUT the signal is checked:
 1. Does the signal name match any of the "signal-name-based" tolerance definitions?
     - first matching tolerance definition is applied (based on regex <-> signal-name)
-    - If no signal-name based tolerance was defined, default tolerances based no data type are considered:
+    - If no signal-name based tolerance was defined, default tolerances based on data type are considered:
 2. Does the signal use a floating point data type? [ 'double', 'single', 'float', 'float32', 'float64', 'real' ]
     - apply default tolerances for floats (if defined)
 3. Does the signal use a fixed-point data type? (integer with LSB < 1)
