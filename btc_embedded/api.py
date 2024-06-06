@@ -20,19 +20,26 @@ EXCLUDED_ERROR_MESSAGES = [ 'The compiler is already defined', 'No message found
 
 class EPRestApi:
     #Starter for the EP executable
-    def __init__(self, host='http://localhost', port=1337, version=None, install_root=None, install_location=None, lic='', config=None, license_location=None, timeout=120, skip_matlab_start=False, skip_config_install=False):
+    def __init__(self, host='http://localhost', port=1337, version=None, install_root='C:/Program Files/BTC', install_location=None, lic='', config=None, license_location=None, timeout=120, skip_matlab_start=False, skip_config_install=False):
         """
         Wrapper for the BTC EmbeddedPlatform REST API
         - when created without arguments, it uses the default install 
         location & version defined in the global config (btc_config.yml)
         - the global config is identified by the BTC_API_CONFIG_FILE 
         env variable or uses the btc_config.yml file shipped with this module as a fallback
-
-        On Mac and Linux operating systems, the tool start is not handled by the wrapper.
-        Instead, it tries to connect to a running instance at the specified port.
-        You can call something like
-           'docker run -p 1337:8080 -v "/my/workdir:/my/workdir" btces/ep'
-        to run the BTC EmbeddedPlatform docker image.
+        
+        Parameters (all optional):
+        - host: a valid hostname or IP address to connect to the BTC EmbeddedPlatform API (default: 'http://localhost')
+        - port: the port to use to communicate with the BTC EmbeddedPlatform API (default: 1337)
+        - version: the BTC EmbeddedPlatform API (like '24.2p0', default: determined automatically)
+        - install_root: root directory of the BTC installation (default: 'C:/Program Files/BTC')
+        - install_location: alternative way to specify the BTC executable (default: determined automatically)
+        - lic can optionally be defined to select a license package (e.g. lic='ET_BASE' to only use EmbeddedTester BASE)
+        - license_location should point to the flexnet license server serving the btc licenses
+        - config: you can pass in a config object to override settings of the global configuration with project specific values
+        - timeout: timeout in seconds to start up BTC EmbeddedPlatform (default: 120)
+        - skip_config_install: skips the automatic installation of a global btc_config.yml on your machine (default: False)
+        - skip_matlab_start: only relevant in Docker-based use cases where Matlab is available but shall not be started (default: False)
         """
         self._PORT_ = "8080" if platform.system() == 'Linux' else str(port)
         self._HOST_ = host
@@ -378,7 +385,7 @@ class EPRestApi:
             '-Dbtc.root.temp.dir=' + os.environ['TMP_DIR'],
             '-Dep.licensing.location=' + os.environ['LICENSE_LOCATION'],
             '-Dep.licensing.package=' + os.environ['LICENSE_PACKAGES'],
-            '-Drest.port=' + os.environ['REST_PORT'],
+            '-Dep.rest.port=' + os.environ['REST_PORT'],
             '-Dosgi.configuration.area.default=/tmp/ep/configuration',
             '-Dosgi.instance.area.default=/tmp/ep/workspace',
             '-Dep.runtime.batch=ep',
