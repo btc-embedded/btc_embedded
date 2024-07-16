@@ -85,7 +85,7 @@ def install_report_templates(template_folder):
     except:
         print(f"[WARNING] Could not install report templates to '{template_folder}'")
 
-def set_tolerances(ep, tol_fxp={ 'abs': '1*LSB' }, tol_flp={ 'abs': 1E-16, 'rel': 1E-8 }, use_case='B2B'):
+def set_tolerances(ep, tol_fxp={ 'abs': '1*LSB' }, tol_flp={ 'abs': 1E-16, 'rel': 1E-8 }, use_case='B2B', signal_name_based_tolerances=None):
     """Sets the tolerances for float (tol_flp) and fixed-point (tol_fxp) outputs (integers with an LSB < 1 are considered fxp) \n
     - use_case can be 'RBT' or 'B2B' (default)
 
@@ -98,7 +98,7 @@ def set_tolerances(ep, tol_fxp={ 'abs': '1*LSB' }, tol_flp={ 'abs': 1E-16, 'rel'
     - tol_flp = { 'rel': 0.004 }
     - tol_flp = None   (no tolerance for floats)
     """
-    subsystems_and_signal_data = _collect_scope_signal_data(ep, tol_fxp, tol_flp)
+    subsystems_and_signal_data = _collect_scope_signal_data(ep, tol_fxp, tol_flp, signal_name_based_tolerances=signal_name_based_tolerances)
     if subsystems_and_signal_data:
         tolerance_xml_file = _generate_tolerance_xml(subsystems_and_signal_data)
         _apply_tolerances_to_profile(ep, tolerance_xml_file, use_case)
@@ -127,7 +127,7 @@ def apply_tolerances_from_config(ep):
         tolerance_definition_found = False
     return tolerance_definition_found
 
-def _collect_scope_signal_data(ep, tol_fxp, tol_flp):
+def _collect_scope_signal_data(ep, tol_fxp, tol_flp, signal_name_based_tolerances):
     # query tolerances based on category (using model name)
     xml_subsystems = []
     scopes = ep.get('scopes')
@@ -149,24 +149,32 @@ def _collect_scope_signal_data(ep, tol_fxp, tol_flp):
         for signal_info in signal_infos:
             kind = _get_signal_kind(signal_info)
             if kind not in ['OUTPUT', 'LOCAL']: continue
-            if tol_flp and _is_float(signal_info):
-                global_tolerances = tol_flp.copy()
-            elif tol_fxp and _is_fxp(signal_info):
-                global_tolerances = tol_fxp.copy()
-            else:
-                continue
+            tolerances = None
+            if signal_name_based_tolerances:
+                for tol_definition in signal_name_based_tolerances:
+                    regex = tol_definition['regex']
+                    if re.match(regex, signal_info['name']):
+                        tolerances = tol_definition
+                
+            if not tolerances:
+                if tol_flp and _is_float(signal_info):
+                    tolerances = tol_flp.copy()
+                elif tol_fxp and _is_fxp(signal_info):
+                    tolerances = tol_fxp.copy()
+                else:
+                    continue
             # undefined tolerance defaults to zero tolerance
-            if not 'abs' in global_tolerances: global_tolerances['abs'] = 0
-            if not 'rel' in global_tolerances: global_tolerances['rel'] = 0
-            _convert_lsb_based_tolerances(global_tolerances, signal_info['resolution'])
+            if not 'abs' in tolerances: tolerances['abs'] = 0
+            if not 'rel' in tolerances: tolerances['rel'] = 0
+            _convert_lsb_based_tolerances(tolerances, signal_info['resolution'])
             xml_signal = { 
                 'kind' : 'PORT' if kind == 'OUTPUT' else 'DISPLAY',
                 'name' : signal_info['name'],
                 'dataType' : signal_info['dataType'],
                 'lsb' : signal_info['resolution'],
                 'offset' : signal_info['offset'],
-                'absTolerance' : global_tolerances['abs'],
-                'relTolerance' : global_tolerances['rel']
+                'absTolerance' : tolerances['abs'],
+                'relTolerance' : tolerances['rel']
             }
             xml_subsystem['signals'].append(xml_signal)
         
