@@ -37,6 +37,44 @@ Windows
     - https://github.com/btc-embedded/btc-ci-workflow/blob/main/btc_config.yml
 - Some report templates are also added and can be used when creating a project report
 
+## Tolerances
+Tolerances for requirements-based testing (RBT) and back-to-back testing (B2B) can be specified as part of the btc_config.yml file for BTC EmbeddedPlatform versions 24.1 and higher (see comments in [btc_config.yml](https://github.com/btc-embedded/btc_embedded/blob/main/btc_embedded/resources/btc_config.yml) for more details).
+When configured in the config, they will automatically be applied to the test project(supported with EP 24.1 and beyond).
+
+For each scope, for each DISP/OUT the signal is checked:
+1. Does the signal name match any of the "signal-name-based" tolerance definitions?
+    - first matching tolerance definition is applied (based on regex <-> signal-name)
+    - If no signal-name based tolerance was defined, default tolerances based on data type are considered:
+2. Does the signal use a floating point data type? [ 'double', 'single', 'float', 'float32', 'float64', 'real' ]
+    - apply default tolerances for floats (if defined)
+3. Does the signal use a fixed-point data type? (integer with LSB < 1)
+    - apply default tolerances for fixed-point (if defined)
+    - tolerance can also be defined as a multiple of the LSB (e.g. 1*LSB)
+
+**abs**: absolute tolerance - a deviation <= **abs** will be accepted as PASSED
+
+**rel**: relative tolerance - accepted deviation <= (reference value * **rel**) will be accepted as PASSED
+     useful for floats to compensate for low precision on high float values
+
+```yaml
+tolerances:
+  B2B: 
+    # specific tolerances for matching signals
+    signal-name-based:
+      - regex: .*_write.*
+        rel: 2e-1
+      - regex: .*dsout_.*
+        abs: 4e-6
+        rel: 4e-4
+
+    # default tolerances for anything else
+    floating-point:
+      abs: 0.001
+      rel: 0.01
+    fixed-point:
+      abs: 1*LSB
+```
+
 ## Docker/Linux
 - the config & the env variable are part of the build
 - the report-templates should also be part of the image
