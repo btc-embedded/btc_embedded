@@ -369,7 +369,7 @@ class EPRestApi:
                 content = file.read()
             version = re.search(r'/ep/(\d+\.\d+[a-zA-Z]*\d+)/', content).group(1)
         except:
-            version = '24.1p0'
+            version = '24.2p0'
         headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
         matlab_ip = os.environ['MATLAB_IP'] if 'MATLAB_IP' in os.environ else '127.0.0.1'
         print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')

@@ -10,7 +10,7 @@
 
 # General settings - will be considered when creating the api object: ep = EPRestApi()
 installationRoot: C:/Program Files/BTC
-epVersion: 24.1p0
+epVersion: 24.2p0
 #licenseLocation: 27000@10.18.2.1
 
 # Preferences: key-value pairs according to

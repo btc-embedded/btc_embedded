@@ -1,5 +1,5 @@
 # Starting from public image mathworks/matlab
-ARG EP_RELEASE=24.1p0
+ARG EP_RELEASE=24.2p0
 ARG MATLAB_RELEASE=R2023b
 
 # FROM btces/ep-migrator:${EP_RELEASE} as ep-migrator

@@ -85,11 +85,6 @@ def install_report_templates(template_folder):
     except:
         print(f"[WARNING] Could not install report templates to '{template_folder}'")
 
-<<<<<<< HEAD
-def set_tolerances(ep, tol_fxp={ 'abs': '1*LSB' }, tol_flp={ 'abs': 1E-16, 'rel': 1E-8 }, use_case='B2B', signal_name_based_tolerances=None):
-    """Sets the tolerances for float (tol_flp) and fixed-point (tol_fxp) outputs (integers with an LSB < 1 are considered fxp) \n
-    - use_case can be 'RBT' or 'B2B' (default)
-=======
 def set_tolerances(ep, tol_fxp={ 'abs': '1*LSB' }, tol_flp={ 'abs': 1E-16, 'rel': 1E-8 }, tol_regex=[], use_case='B2B'):
     """Tolerances can be defined for RBT (requirements-based tests) and B2B (back-to-back & regression tests)
 and will automatically be applied (supported with EP 24.1 and beyond)
@@ -102,17 +97,12 @@ For each scope, for each DISP/OUT the signal is checked:
 3. Does the signal use a fixed-point data type? (integer with LSB < 1)
   -> apply default tolerances for fixed-point (if defined)
   -> tolerance can also be defined as a multiple of the LSB (e.g. 1*LSB)
->>>>>>> 7cee7c78300d4b851fde5bfae88c7c6b4a484048
 
 abs: absolute tolerance - a deviation <= abs will be accepted as PASSED
 rel: relative tolerance - accepted deviation <= (reference value * rel) will be accepted as PASSED
      useful for floats to compensate for low precision on high float values
     """
-<<<<<<< HEAD
-    subsystems_and_signal_data = _collect_scope_signal_data(ep, tol_fxp, tol_flp, signal_name_based_tolerances=signal_name_based_tolerances)
-=======
     subsystems_and_signal_data = _collect_scope_signal_data(ep, tol_fxp, tol_flp, tol_regex)
->>>>>>> 7cee7c78300d4b851fde5bfae88c7c6b4a484048
     if subsystems_and_signal_data:
         tolerance_xml_file = _generate_tolerance_xml(subsystems_and_signal_data)
         _apply_tolerances_to_profile(ep, tolerance_xml_file, use_case)
@@ -151,11 +141,7 @@ rel: relative tolerance - accepted deviation <= (reference value * rel) will be 
         tolerance_definition_found = False
     return tolerance_definition_found
 
-<<<<<<< HEAD
-def _collect_scope_signal_data(ep, tol_fxp, tol_flp, signal_name_based_tolerances):
-=======
 def _collect_scope_signal_data(ep, tol_fxp, tol_flp, tol_regex):
->>>>>>> 7cee7c78300d4b851fde5bfae88c7c6b4a484048
     # query tolerances based on category (using model name)
     xml_subsystems = []
     scopes = ep.get('scopes')
@@ -177,15 +163,6 @@ def _collect_scope_signal_data(ep, tol_fxp, tol_flp, tol_regex):
         for signal_info in signal_infos:
             kind = _get_signal_kind(signal_info)
             if kind not in ['OUTPUT', 'LOCAL']: continue
-<<<<<<< HEAD
-            tolerances = None
-            if signal_name_based_tolerances:
-                for tol_definition in signal_name_based_tolerances:
-                    regex = tol_definition['regex']
-                    if re.match(regex, signal_info['name']):
-                        tolerances = tol_definition
-                
-=======
             # check if a defined regular expression matches the current signal name
             tolerances = None
             if tol_regex: # list of signal-name-based tolerance definitions
@@ -194,7 +171,6 @@ def _collect_scope_signal_data(ep, tol_fxp, tol_flp, tol_regex):
                         tolerances = tolerance_definition
                         break
             # if not, apply default tolerances
->>>>>>> 7cee7c78300d4b851fde5bfae88c7c6b4a484048
             if not tolerances:
                 if tol_flp and _is_float(signal_info):
                     tolerances = tol_flp.copy()
@@ -202,11 +178,7 @@ def _collect_scope_signal_data(ep, tol_fxp, tol_flp, tol_regex):
                     tolerances = tol_fxp.copy()
                 else:
                     continue
-<<<<<<< HEAD
-            # undefined tolerance defaults to zero tolerance
-=======
             # "undefined tolerance" defaults to "zero tolerance"
->>>>>>> 7cee7c78300d4b851fde5bfae88c7c6b4a484048
             if not 'abs' in tolerances: tolerances['abs'] = 0
             if not 'rel' in tolerances: tolerances['rel'] = 0
             _convert_lsb_based_tolerances(tolerances, signal_info['resolution'])

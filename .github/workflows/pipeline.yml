@@ -8,7 +8,7 @@ on:
 jobs:
   test-windows:
     runs-on: self-hosted
-    if: ${{ contains(github.event.head_commit.message, '#test-windows') }}
+    if: ${{ contains(github.event.head_commit.message, '#test-windows') || contains(github.event.head_commit.message, '#release') }}
 
     steps:
     - uses: actions/checkout@v3
@@ -28,7 +28,7 @@ jobs:
 
   test-docker:
     runs-on: self-hosted
-    if: ${{ contains(github.event.head_commit.message, '#test-docker') }}
+    if: ${{ contains(github.event.head_commit.message, '#test-docker') || contains(github.event.head_commit.message, '#release') }}
 
     steps:
     - uses: actions/checkout@v3
@@ -40,7 +40,7 @@ jobs:
         $env:ML_LIC_CONTENT | Out-File -FilePath "${{github.workspace}}/test/licenses/matlab.lic" -Encoding UTF8
         $env:BTC_LIC_CONTENT | Out-File -FilePath "${{github.workspace}}/test/licenses/btc.lic" -Encoding UTF8
         Copy-Item -Path "btc_embedded/resources/projectreport_templates" -Destination "test/report_templates" -Recurse
-        docker build -t ep-ml:24.1_23b test
+        docker build -t ep-ml:24.2_23b test
       env:
         ML_LIC_CONTENT: ${{ secrets.ML_LICENSE }}
         BTC_LIC_CONTENT: ${{ secrets.BTC_LICENSE }}
@@ -50,13 +50,13 @@ jobs:
         docker run --rm --mac-address 02:42:ac:11:13:37 `
             --volume "${{github.workspace}}:/workdir" `
             --workdir "/workdir" `
-            ep-ml:24.1_23b `
+            ep-ml:24.2_23b `
             sh -c "pip3 install . && python3 test/test.py test/test.epp"
 
   deploy:
     needs: [ test-windows, test-docker ]
     runs-on: ubuntu-latest
-    if: ${{ contains(github.event.head_commit.message, '#deploy') }}
+    if: ${{ contains(github.event.head_commit.message, '#deploy') || contains(github.event.head_commit.message, '#release') }}
 
     steps:
     - uses: actions/checkout@v3

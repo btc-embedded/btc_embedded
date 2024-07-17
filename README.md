@@ -16,7 +16,7 @@ The python module btc_embedded lets you start & stop a headless BTC EmbeddedPlat
 When creating the API object without further parameters, the module looks for an instance of BTC EmbeddedPlatform on http://localhost:1337. If it doesn't find a running instance, it will start one and return once it connected to it. The console output will look roughly like this:
 
 ```Applying global config from 'C:\ProgramData\BTC\ep\btc_config.yml'
-Waiting for BTC EmbeddedPlatform 24.1p0 to be available:
+Waiting for BTC EmbeddedPlatform 24.2p0 to be available:
 Connecting to BTC EmbeddedPlatform REST API at http://localhost:1337
 ....
 BTC EmbeddedPlatform has started.

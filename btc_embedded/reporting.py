@@ -30,7 +30,7 @@ def create_test_report_summary(results, report_title='BTC Test Report Summary', 
     # prepare projects_string, containing info for all projects
     projects_string = ''
     for result in results:
-        projects_string += get_project_string(result) + '\r\n'
+        projects_string += get_project_string(result, target_dir) + '\r\n'
 
     # import html template
     with open(os.path.join(resources.files('btc_embedded'), 'resources', 'btc_summary_report.template'), 'r') as template_file:
@@ -58,7 +58,13 @@ def create_test_report_summary(results, report_title='BTC Test Report Summary', 
 # ----------------------------- Sub-functions -----------------------------
 #
 
-def get_project_string(result):
+def get_project_string(result, target_dir):
+    target_dir_abs = os.path.abspath(target_dir).replace('\\', '/')
+    report_abspath = os.path.abspath(result['reportPath']).replace('\\', '/')
+    epp_abspath = os.path.abspath(result['eppPath']).replace('\\', '/')
+    report_relpath = os.path.relpath(report_abspath, target_dir_abs)
+    epp_relpath = os.path.relpath(epp_abspath, target_dir_abs)
+
     # we need to replace the following placeholders:
     # - projectName      : can be eppName without extension
     # - testResult       : PASSED / FAILED / NO_VERDICT / ERROR
@@ -80,8 +86,8 @@ def get_project_string(result):
     project_html_entry = template.format(
         projectName = result["projectName"],
         testResult = result["testResult"],
-        reportPath = result["reportPath"],
-        eppPath = result["eppPath"],
+        reportPath = report_relpath,
+        eppPath = epp_relpath,
         eppName = os.path.basename(result["eppPath"]),
         duration = seconds_to_hms(result["duration"]),
         statusIconClass = ('icon-sdc' if result["testResult"] == 'PASSED' else 'icon-wdc' if result["testResult"] == 'FAILED' else 'icon-edc'),
