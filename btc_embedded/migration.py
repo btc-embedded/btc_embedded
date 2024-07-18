@@ -26,7 +26,7 @@ def migration_suite_source(models, matlab_version, toolchain_script=None, test_m
     # start ep, connect to selected matlab version and run toolchain script
     ep = start_ep_and_configure_matlab(matlab_version, ep)
     if toolchain_script: # evaluate toolchain script in the base workspace
-        ep.post('execute-long-matlab-script', {'scriptName' : 'evalin', 'inArgs' : [ 'base', f"run('{toolchain_script}')" ]}, message=f"Evaluating toolchain script '{toolchain_script}' in Matlab base workspace.")
+        util.run_matlab_script(os.path.abspath(toolchain_script))
 
     # run migration source part for all models
     model_results = {}

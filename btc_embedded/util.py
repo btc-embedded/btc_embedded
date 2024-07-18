@@ -3,6 +3,17 @@ import shutil
 import zipfile
 
 
+def run_matlab_script(ep, matlab_script_abs_path):
+    """Evaluates the given script in the matlab base workspace:
+    **evalin('base', 'run(matlab_script_abs_path)')**"""
+    ep.post('execute-long-matlab-script',
+        {
+            'scriptName' : 'evalin',
+            'inArgs' : [ 'base', f"run('{matlab_script_abs_path}')" ]
+        },
+        message=f"Evaluating '{matlab_script_abs_path}' in Matlab base workspace.")
+
+
 def print_rbt_results(response, coverage_response=None):
     """Example on how to access coverage and test result data.
     Depending on your desired CI-workflow, you would usually not just print

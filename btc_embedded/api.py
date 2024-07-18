@@ -15,8 +15,15 @@ from btc_embedded.helpers import install_btc_config, install_report_templates
 
 VERSION_PATTERN = r'ep(\d+\.\d+[a-zA-Z]\d+)' # e.g. "ep24.3p1"
 HEADERS = {'Accept': 'application/json, text/plain', 'Content-Type' : 'application/json'}
-DATE_FORMAT = '%d-%b-%Y %H:%M:%S'
-EXCLUDED_ERROR_MESSAGES = [ 'The compiler is already defined', 'No message found for the given query.' ]
+DATE_FORMAT_MESSAGES = '%d-%b-%Y %H:%M:%S'
+DATE_FORMAT_LOGFILE = '%Y-%m-%d %H:%M:%S'
+EXCLUDED_ERROR_MESSAGES = [
+    'The compiler is already defined',
+    'No message found for the given query.'
+]
+EXCLUDED_LOG_MESSAGES = [
+    'Registry key could not be read: The system cannot find the file specified'
+]
 
 class EPRestApi:
     #Starter for the EP executable
@@ -80,6 +87,7 @@ class EPRestApi:
                 raise Exception("Application didn't respond within the defined timeout.")
             elif (not self._is_ep_process_still_alive()):
                 print(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")
+                self._print_log_entries(start_time)
                 raise Exception("Application failed to start.")
             time.sleep(2)
             print('.', end='')
@@ -159,7 +167,7 @@ class EPRestApi:
             if severity: path += ('&' if search_string else '?') + f"severity={severity}"
             try:
                 messages = self.get(path)
-                messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT))
+                messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT_MESSAGES))
                 for msg in messages:
                     print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
                 print("\n")
@@ -449,10 +457,44 @@ class EPRestApi:
         return api_call_supported
 
     def _is_ep_process_still_alive(self):
-        return self.ep_process.poll() is None
+        return self.ep_process and self.ep_process.poll() is None
 
     def _is_localhost(self):
         return self._HOST_ in [ 'http://localhost', 'http://127.0.0.1']
+    
+    def _print_log_entries(self, start_time):
+        if self.log_file_path and os.path.isfile(self.log_file_path):
+            # Regular expression pattern to match timestamp lines
+            timestamp_pattern = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+            log_entries = []
+            with open(self.log_file_path, 'r') as logfile:
+                current_entry = None
+                for line in logfile:
+                    timestamp_pattern_match = timestamp_pattern.match(line)
+                    if timestamp_pattern_match:
+                        # store previous entry
+                        if current_entry: log_entries.append(current_entry.strip())
+                        # start new entry if time matches
+                        timestamp_str = timestamp_pattern_match.group(0)
+                        timestamp = datetime.strptime(timestamp_str, DATE_FORMAT_LOGFILE)
+                        # create bools for readability
+                        is_recent = timestamp > datetime.fromtimestamp(start_time)
+                        is_error = 'ERROR' in line.upper()
+                        is_not_excluded = not any(bad_string in line for bad_string in EXCLUDED_LOG_MESSAGES)
+                        # check if line is relevant
+                        if is_error and is_recent and is_not_excluded:
+                            current_entry = line
+                        else:
+                            current_entry = None
+                    else:
+                        # Continuation of the current log entry
+                        if not current_entry == None:
+                            current_entry += line + "\n"
+                
+                # add last entry (if any)
+                if current_entry: log_entries.append(current_entry.strip())
+            
+            for entry in log_entries: print(entry)
 
 
 # if called directly, starts EP based on the global config
