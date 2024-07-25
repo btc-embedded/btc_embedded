@@ -106,7 +106,7 @@ class EPRestApi:
             while self._is_rest_service_available():
                 if (time.time() - start_time) > 10:
                     # kill by PID if it didn't close within 10s
-                    os.kill(self.ep_process, signal.SIGINT)
+                    os.kill(self.ep_process.pid, signal.SIGINT)
                 else:
                     time.sleep(2)
             self.definitively_closed = True
