@@ -221,7 +221,7 @@ def _generate_tolerance_xml(subsystems, tolerance_xml_file='tolerances.xml'):
         for signal in subsystem['signals']:
             # <Output>
             output_node = output_node_template.format(
-                unique_name=signal['name'],
+                unique_name=signal['name'].replace("<", "&lt;").replace(">", "&gt;"),
                 abs_value=signal['absTolerance'],
                 rel_value=signal['relTolerance'],
                 kind=signal['kind'],
