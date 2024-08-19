@@ -1,4 +1,5 @@
 import datetime
+import getpass
 import os
 from importlib import resources
 
@@ -38,7 +39,7 @@ def create_test_report_summary(results, report_title='BTC Test Report Summary', 
 
     # fill placeholders in template
     final_html = html_template.replace('__title__', report_title)\
-                              .replace('__creator__', os.getenv('USERNAME') or os.getlogin())\
+                              .replace('__creator__', getpass.getuser() or os.getenv('USERNAME') or os.getenv('USER'))\
                               .replace('__timestamp__', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))\
                               .replace('__totalDuration__', seconds_to_hms(total_duration))\
                               .replace('__averageDuration__', seconds_to_hms(total_duration // len(results)))\

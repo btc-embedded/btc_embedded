@@ -320,7 +320,8 @@ def src_04_reference_simulation(ep, toplevel_uid, test_mil, export_executions, r
                 mil_er_dir = os.path.join(result_dir, 'ER', 'MIL')
                 ep.post('execution-records-export', { 'UIDs' : mil_execution_records_uids, 'exportDirectory': mil_er_dir })
 
-        step_result['erDir'] = os.path.join(result_dir, 'ER')
+        if export_executions:
+            step_result['erDir'] = os.path.join(result_dir, 'ER')
         step_result['status'] = 'PASSED'
     except Exception as e:
         handle_error(ep, step_result)
