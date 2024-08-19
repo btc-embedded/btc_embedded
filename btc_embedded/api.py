@@ -329,6 +329,10 @@ class EPRestApi:
             # Create absolute path using root dir
             root_dir = os.path.dirname(os.environ[BTC_CONFIG_ENVVAR_NAME])
             return os.path.join(root_dir, rel_path)
+        elif self.config:
+            # Create absolute path using root dir
+            root_dir = os.path.dirname(self.config)
+            return os.path.join(root_dir, rel_path)
         print(f"Cannot convert relative path to absolute path because the environment variable {BTC_CONFIG_ENVVAR_NAME} is not set.")
         return None
     
