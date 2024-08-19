@@ -33,12 +33,12 @@ Windows
 - If the environment variable **BTC_API_CONFIG_FILE** is set and points to a config file, it is being considered and any preferences defined inside are applied automatically when the API object is created
 - Otherwise, the API wrapper will add a config file “C:/ProgramData/BTC/ep/config.yml” with some reasonable defaults (e.g., the EP install directory, the latest compatible Matlab version, etc.)
 - Examples of the config file can be found here:
-    - https://github.com/btc-embedded/btc_embedded/blob/main/btc_embedded/resources/btc_config.yml
+    - https://github.com/btc-embedded/btc_embedded/blob/main/btc_embedded/resources/btc_config_windows.yml
     - https://github.com/btc-embedded/btc-ci-workflow/blob/main/btc_config.yml
 - Some report templates are also added and can be used when creating a project report
 
 ## Tolerances
-Tolerances for requirements-based testing (RBT) and back-to-back testing (B2B) can be specified as part of the btc_config.yml file for BTC EmbeddedPlatform versions 24.1 and higher (see comments in [btc_config.yml](https://github.com/btc-embedded/btc_embedded/blob/main/btc_embedded/resources/btc_config.yml) for more details).
+Tolerances for requirements-based testing (RBT) and back-to-back testing (B2B) can be specified as part of the btc_config.yml file for BTC EmbeddedPlatform versions 24.1 and higher (see comments in [btc_config.yml](https://github.com/btc-embedded/btc_embedded/blob/main/btc_embedded/resources/btc_config_windows.yml) for more details).
 When configured in the config, they will automatically be applied to the test project(supported with EP 24.1 and beyond).
 
 For each scope, for each DISP/OUT the signal is checked:

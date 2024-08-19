@@ -23,7 +23,12 @@ def __get_global_config():
         global_config_file_path = BTC_CONFIG_DEFAULTLOCATION
     # Option C: use defaults shipped with this module
     else:
-        config_file_template = os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config.yml')
+        if platform.system() == 'Windows':
+            config_file_template = os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config_windows.yml')
+        elif platform.system() == 'Linux':
+            config_file_template = os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config_linux.yml')
+        else:
+            raise Exception(f"Unsupported OS: {platform.system()} (only Linux and Windows are supported)")
         global_config_file_path = str(config_file_template)
     # load config
     config = __load_config(global_config_file_path)

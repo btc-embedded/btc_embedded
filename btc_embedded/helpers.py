@@ -53,7 +53,7 @@ def install_btc_config():
                         # higher values will overwrite this
 
         if ep_version and install_location:
-            config_file_template = os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config.yml')
+            config_file_template = os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config_windows.yml')
             with open(config_file_template, 'r') as f:
                 config = yaml.safe_load(f) or {}
                 config['installationRoot'] = install_location.replace(f'ep{ep_version}', '')[:-1]
