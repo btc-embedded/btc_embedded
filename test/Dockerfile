@@ -73,7 +73,6 @@ COPY --chown=1000 --from=ep /root/.BTC/ep/${EP_RELEASE}/config/compiler_pref/com
 COPY --chown=1000 --from=ep /opt/ep ${EP_INSTALL_PATH}
 
 # and some files from the build context
-COPY --chown=1000 report_templates /home/matlab/Documents/report_templates
 COPY --chown=1000 addMLIntegration.bash /tmp/
 RUN sudo chmod +x /tmp/addMLIntegration.bash && sudo /tmp/addMLIntegration.bash && sudo rm /tmp/addMLIntegration.bash
 
