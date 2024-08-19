@@ -11,7 +11,7 @@ from urllib.parse import quote, unquote
 import requests
 
 from btc_embedded.config import (BTC_CONFIG_ENVVAR_NAME,
-                                 __get_config_path_from_resources,
+                                 get_config_path_from_resources,
                                  get_global_config)
 from btc_embedded.helpers import install_btc_config, install_report_templates
 
@@ -296,7 +296,7 @@ class EPRestApi:
                     if BTC_CONFIG_ENVVAR_NAME in os.environ:
                         template_folder = self._rel_to_abs(config['preferences'][pref_key])
                     else:
-                        template_folder = __get_config_path_from_resources()
+                        template_folder = get_config_path_from_resources()
                     if not (template_folder and os.path.isdir(template_folder)):
                         install_report_templates(template_folder)
                     preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': template_folder })

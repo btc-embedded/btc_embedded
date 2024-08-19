@@ -23,7 +23,7 @@ def __get_global_config():
         global_config_file_path = BTC_CONFIG_DEFAULTLOCATION
     # Option C: use defaults shipped with this module
     else:
-        global_config_file_path = __get_config_path_from_resources()
+        global_config_file_path = get_config_path_from_resources()
     # load config
     config = __load_config(global_config_file_path)
     print(f"Applying global config from '{global_config_file_path}'")
@@ -77,7 +77,7 @@ def get_vector_gen_config(scope_uid, config=None):
     """
     return { 'scopeUid' : scope_uid }
 
-def __get_config_path_from_resources():
+def get_config_path_from_resources():
     if platform.system() == 'Windows':
         return str(os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config_windows.yml'))
     elif platform.system() == 'Linux':
