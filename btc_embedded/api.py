@@ -10,7 +10,9 @@ from urllib.parse import quote, unquote
 
 import requests
 
-from btc_embedded.config import BTC_CONFIG_ENVVAR_NAME, get_global_config
+from btc_embedded.config import (BTC_CONFIG_ENVVAR_NAME,
+                                 __get_config_path_from_resources,
+                                 get_global_config)
 from btc_embedded.helpers import install_btc_config, install_report_templates
 
 VERSION_PATTERN = r'ep(\d+\.\d+[a-zA-Z]\d+)' # e.g. "ep24.3p1"
@@ -291,7 +293,10 @@ class EPRestApi:
                 elif pref_key == 'GENERAL_COMPILER_SETTING':
                     self.set_compiler(value=config['preferences'][pref_key])
                 elif pref_key == 'REPORT_TEMPLATE_FOLDER':
-                    template_folder = self._rel_to_abs(config['preferences'][pref_key])
+                    if BTC_CONFIG_ENVVAR_NAME in os.environ:
+                        template_folder = self._rel_to_abs(config['preferences'][pref_key])
+                    else:
+                        template_folder = __get_config_path_from_resources()
                     if not (template_folder and os.path.isdir(template_folder)):
                         install_report_templates(template_folder)
                     preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': template_folder })
@@ -328,10 +333,6 @@ class EPRestApi:
         elif BTC_CONFIG_ENVVAR_NAME in os.environ:
             # Create absolute path using root dir
             root_dir = os.path.dirname(os.environ[BTC_CONFIG_ENVVAR_NAME])
-            return os.path.join(root_dir, rel_path)
-        elif self.config:
-            # Create absolute path using root dir
-            root_dir = os.path.dirname(self.config)
             return os.path.join(root_dir, rel_path)
         print(f"Cannot convert relative path to absolute path because the environment variable {BTC_CONFIG_ENVVAR_NAME} is not set.")
         return None

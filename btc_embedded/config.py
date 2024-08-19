@@ -23,13 +23,7 @@ def __get_global_config():
         global_config_file_path = BTC_CONFIG_DEFAULTLOCATION
     # Option C: use defaults shipped with this module
     else:
-        if platform.system() == 'Windows':
-            config_file_template = os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config_windows.yml')
-        elif platform.system() == 'Linux':
-            config_file_template = os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config_linux.yml')
-        else:
-            raise Exception(f"Unsupported OS: {platform.system()} (only Linux and Windows are supported)")
-        global_config_file_path = str(config_file_template)
+        global_config_file_path = __get_config_path_from_resources()
     # load config
     config = __load_config(global_config_file_path)
     print(f"Applying global config from '{global_config_file_path}'")
@@ -82,6 +76,14 @@ def get_vector_gen_config(scope_uid, config=None):
     list and description of available preferences and their effects.
     """
     return { 'scopeUid' : scope_uid }
+
+def __get_config_path_from_resources():
+    if platform.system() == 'Windows':
+        return str(os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config_windows.yml'))
+    elif platform.system() == 'Linux':
+        return str(os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config_linux.yml'))
+    else:
+        raise Exception(f"Unsupported OS: {platform.system()} (only Linux and Windows are supported)")
 
 def __load_config(config_file):
     """Attemps to load a config from the specified yaml file.
