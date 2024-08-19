@@ -12,7 +12,7 @@ def run_btc_tests(epp_file):
 
     # Load a BTC EmbeddedPlatform profile (*.epp) and update it
     ep.get(f'profiles/{epp_file}?discardCurrentProfile=true', message="Loading test project")
-    ep.put('architectures', message="Updating test project")
+    ep.put('architectures?performUpdateCheck=true', message="Updating test project")
 
     # Execute requirements-based tests
     scopes = ep.get('scopes')

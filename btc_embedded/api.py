@@ -296,7 +296,7 @@ class EPRestApi:
                     if BTC_CONFIG_ENVVAR_NAME in os.environ:
                         template_folder = self._rel_to_abs(config['preferences'][pref_key])
                     else:
-                        template_folder = get_config_path_from_resources()
+                        template_folder = os.path.join(os.path.dirname(get_config_path_from_resources()), 'projectreport_templates')
                     if not (template_folder and os.path.isdir(template_folder)):
                         install_report_templates(template_folder)
                     preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': template_folder })
