@@ -2,9 +2,9 @@
 # Global config file for BTC EmbeddedPlatform CI workflow
 # - set environment variable BTC_API_CONFIG_FILE to point to this YAML file
 #
-# - if BTC_API_CONFIG_FILE is not set:
-#   - a default config from the pip package btc_embedded is used
-#   - https://github.com/btc-embedded/btc_embedded/blob/main/btc_embedded/btc_config.yml
+# - if BTC_API_CONFIG_FILE is not set, a default config from the pip package btc_embedded is used (depending on OS):
+#   - https://github.com/btc-embedded/btc_embedded/blob/main/btc_embedded/btc_config_windows.yml
+#   - https://github.com/btc-embedded/btc_embedded/blob/main/btc_embedded/btc_config_linux.yml
 #
 # ------------------------------------------------------------------
 
