@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='btc_embedded',
-    version='24.2.4',
+    version='24.2.5',
     packages=['btc_embedded'],
     include_package_data=True,
     license='MIT',
@@ -13,7 +13,7 @@ setup(
     url='https://github.com/btc-embedded/btc_embedded',
     install_requires=[ 'requests', 'pyyaml' ],
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Testing',
         'License :: OSI Approved :: MIT License',
