@@ -22,11 +22,11 @@ def migration_suite_source(models, matlab_version, toolchain_script=None, test_m
     initialize_report(models=models,
                       title='BTC Migration Test Suite',
                       filename='BTCMigrationTestSuite.html',
-                      additional_stats={ 'oldMatlabVersion' : matlab_version,  'toolchainScriptSrc' : toolchain_script })
+                      additional_stats={ 'toolchainScriptSrc' : os.path.abspath(toolchain_script) })
 
     # clear results folder
     #shutil.rmtree('results', ignore_errors=True)
-    prepare_ep_and_matlab(MIGRATION_PHASE_OLD, matlab_version, toolchain_script, ep)
+    ep = prepare_ep_and_matlab(MIGRATION_PHASE_OLD, matlab_version, toolchain_script, ep)
 
     # run migration source part for all models
     model_results = {}
@@ -50,7 +50,7 @@ def migration_suite_target(models, matlab_version, model_results=None, accept_in
     results = []
     global report_json; report_json = os.path.abspath(os.path.join('results', 'report.json'))
 
-    prepare_ep_and_matlab(MIGRATION_PHASE_NEW, matlab_version, toolchain_script, ep)
+    ep = prepare_ep_and_matlab(MIGRATION_PHASE_NEW, matlab_version, toolchain_script, ep)
 
     # run migration target part for all models and collect results
     for new_model in models:
@@ -188,7 +188,7 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     if not ep_api_object: ep.close_application()
 
     # time measurement
-    project_result_item = get_project_result_item(model_name, matlab_version, epp_rel_path, start_time, b2b_coverage=b2b_coverage, sil_test=sil_test)
+    project_result_item = get_project_result_item(model_name, epp_rel_path, start_time, b2b_coverage=b2b_coverage, sil_test=sil_test)
     update_report(project_item=project_result_item)
     return project_result_item
 
@@ -224,7 +224,7 @@ def src_01_start_ep(ep_api_object, matlab_version, model_name, results):
             ep = start_ep_and_configure_matlab(matlab_version, ep_api_object)
             step_result['status'] = 'PASSED'
         except Exception as e:
-            handle_error(ep, step_result)
+            handle_error(ep, step_result, error=e)
     results.append(step_result)
     return ep, step_result
 
@@ -263,7 +263,7 @@ def src_02_import_model(ep, model_path, script_path, model_name, matlab_version,
         toplevel_uid = ep.get('scopes')[0]['uid']
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result)
+        handle_error(ep, step_result, error=e)
     results.append(step_result)
     return toplevel_uid, step_result
 
@@ -288,7 +288,7 @@ def src_03_generate_vectors(ep, toplevel_uid, model_name, results):
         print('Coverage ' + "{:.2f}%".format(b2b_coverage['MCDCPropertyCoverage']['handledPercentage']))
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result)
+        handle_error(ep, step_result, error=e)
     results.append(step_result)
     return step_result
 
@@ -332,7 +332,7 @@ def src_04_reference_simulation(ep, toplevel_uid, test_mil, export_executions, r
             step_result['erDir'] = os.path.join(result_dir, 'ER')
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result)
+        handle_error(ep, step_result, error=e)
     results.append(step_result)
     return step_result
 
@@ -382,7 +382,7 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, mod
             if not accept_interface_changes: raise Exception(warning)
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result)
+        handle_error(ep, step_result, error=e)
     results.append(step_result)
     return toplevel_uid, step_result
 
@@ -439,7 +439,7 @@ def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, 
         toplevel_uid = ep.get('scopes')[0]['uid']
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result)
+        handle_error(ep, step_result, error=e)
     results.append(step_result)
     return toplevel_uid, step_result
 
@@ -450,7 +450,7 @@ def tgt_06_tolerances(ep, model_name, results):
         tolerance_definition_found = apply_tolerances_from_config(ep)
         step_result['status'] = 'PASSED' if tolerance_definition_found else 'SKIPPED'
     except Exception as e:
-        handle_error(ep, step_result)
+        handle_error(ep, step_result, error=e)
     results.append(step_result)
     return step_result
 
@@ -472,7 +472,7 @@ def tgt_06_regression_test_sil(ep, model_name, results):
         print(f"Result: {sil_test['verdictStatus']}")
         step_result['status'] = sil_test['verdictStatus']
     except Exception as e:
-        handle_error(ep, step_result)
+        handle_error(ep, step_result, error=e)
     results.append(step_result)
     return sil_test, step_result
 
@@ -495,7 +495,7 @@ def tgt_07_regression_test_mil(ep, model_name, results):
         print(f"Result: {mil_test['verdictStatus']}")
         step_result['status'] = mil_test['verdictStatus']
     except Exception as e:
-        handle_error(ep, step_result)
+        handle_error(ep, step_result, error=e)
     results.append(step_result)
     return mil_test, step_result
 
@@ -517,7 +517,7 @@ def tgt_08_create_report(ep, toplevel_uid, test_mil, result_dir, model_name, res
         ep.post(f"reports/{report['uid']}", { 'exportPath': result_dir, 'newName': f'{model_name}-migration-test' })
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result)
+        handle_error(ep, step_result, error=e)
     results.append(step_result)
     return b2b_coverage, step_result
 
@@ -526,9 +526,9 @@ def get_existing_references(execution_record_folder):
     sil_executions = [os.path.abspath(p) for p in glob.glob(f"{execution_record_folder}/SIL/*.mdf")]
     return mil_executions, sil_executions
 
-def handle_error(ep, step_result, epp_file=None):
+def handle_error(ep, step_result, epp_file=None, error=""):
     step_result['status'] = 'ERROR'
-    step_result['message'] = f"Error in step '{step_result['stepName']}'"
+    step_result['message'] = f"Error in step '{step_result['stepName']}': {error}"
     if epp_file: ep.put('profiles', { 'path': epp_file }, message="Saving profile after error")
     # export messages to {model_name}_messages.html
     global message_report_file
@@ -545,7 +545,7 @@ def prepare_ep_and_matlab(migration_phase, matlab_version, toolchain_script=None
         # start ep, connect to selected matlab version
         ep = start_ep_and_configure_matlab(matlab_version, ep)
         ep_version = ep.get('openapi.json')['info']['version']
-        update_report(additional_stats={ f'{migration_phase} Config' : f'BTC v{ep_version}, Matlab {matlab_version}' })
+        update_report(additional_stats={ f'{migration_phase} Config' : f'BTC {ep_version}, Matlab {matlab_version}' })
         
         # evaluate toolchain script in the base workspace
         if toolchain_script: 
@@ -556,6 +556,8 @@ def prepare_ep_and_matlab(migration_phase, matlab_version, toolchain_script=None
             'status': 'ERROR',
             'globalMessage' : f"Error during preparation of Migration phase '{migration_phase}': {e}" })
         raise e
+    
+    return ep
 
 def get_epp_file_by_name(result_dir, model_path, suffix=''):
     model_name = os.path.basename(model_path)[:-4].replace('Wrapper_', '') + suffix
@@ -609,8 +611,12 @@ def get_project_result_item(model_name, epp_rel_path, start_time, b2b_coverage=N
         result['testResult'] = sil_test['verdictStatus']
     if error_message:
         result['status'] = 'ERROR'
+        result['testResult'] = 'ERROR'
         result['reportPath'] = f"{model_name}_messages.html"
+        result['info'] = error_message
     
+    update_report(project_item=result, additional_stats={'status': 'ERROR'})
+
     return result
 
 def update_report(project_item=None, additional_stats={}):
@@ -631,6 +637,11 @@ def update_report(project_item=None, additional_stats={}):
 
     if additional_stats:
         if 'additionalStats' in report_data:
+            # clear status & globalMessage
+            if 'status' not in additional_stats and 'status' in report_data['additionalStats']:
+                del report_data['additionalStats']['status']
+            if 'globalMessage' not in additional_stats and 'globalMessage' in report_data['additionalStats']:
+                del report_data['additionalStats']['globalMessage']
             # update existing additional_stats section
             report_data['additionalStats'].update(additional_stats)
         else:

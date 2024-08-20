@@ -65,7 +65,7 @@ def create_test_report_summary(results={}, report_title='BTC Test Report Summary
                               .replace('__numberOfProjects__', str(len(results)))\
                               .replace('__numberOfProjectsPassed__', str(sum(1 for _, project in results.items() if "testResult" in project and project["testResult"] == "PASSED")))\
                               .replace('__numberOfProjectsFailed__', str(sum(1 for _, project in results.items() if "testResult" in project and project["testResult"] == "FAILED")))\
-                              .replace('__additional_global_stats__', additional_stats_string(results))\
+                              .replace('__additional_global_stats__', additional_stats_string(additional_stats))\
                               .replace('__projects__', projects_string)
 
     # Write the final HTML file
@@ -88,10 +88,20 @@ def get_additional_stats_string(additional_stats):
 
 def get_project_string(result, target_dir):
     target_dir_abs = os.path.abspath(target_dir).replace('\\', '/')
-    report_abspath = os.path.abspath(result['reportPath']).replace('\\', '/') if 'reportPath' in result else None
-    epp_abspath = os.path.abspath(result['eppPath']).replace('\\', '/') if 'eppPath' in result else None
-    report_relpath = os.path.relpath(report_abspath, target_dir_abs) if report_abspath else None
-    epp_relpath = os.path.relpath(epp_abspath, target_dir_abs) if epp_abspath else None
+    
+    if 'reportPath' in result and os.path.isabs(result['reportPath']):
+        report_relpath = os.path.relpath(result['reportPath'], target_dir_abs).replace('\\', '/')
+    elif 'reportPath' in result:
+        report_relpath = result['reportPath'].replace('\\', '/')
+    else:
+        report_relpath = None
+
+    if 'eppPath' in result and os.path.isabs(result['eppPath']):
+        epp_relpath = os.path.relpath(result['eppPath'], target_dir_abs).replace('\\', '/')
+    elif 'eppPath' in result:
+        epp_relpath = result['eppPath'].replace('\\', '/')
+    else:
+        epp_relpath = None
 
     # we need to replace the following placeholders:
     # - projectName      : can be eppName without extension
@@ -113,10 +123,10 @@ def get_project_string(result, target_dir):
         info = result['info']
     else:
         info = ''
-    if not "testResult" in result: statusIcon = 'icon-mc'
-    elif result["testResult"] == 'PASSED': statusIcon = 'icon-sdc'
-    elif result["testResult"] == 'FAILED': statusIcon = 'icon-wdc'
-    elif result["testResult"] == 'ERROR': statusIcon = 'icon-edc'
+    if not "status" in result or result["status"] in ['SCHEDULED', 'RUNNING']: statusIcon = 'icon-mc'
+    elif result["status"] in ['PASSED', 'COMPLETED']: statusIcon = 'icon-sdc'
+    elif result["status"] == 'FAILED': statusIcon = 'icon-wdc'
+    elif result["status"] == 'ERROR': statusIcon = 'icon-edc'
 
     report_link = f'<a href="{report_relpath}">{result["projectName"]}</a>' if report_relpath else result["projectName"]
     project_html_entry = template.format(

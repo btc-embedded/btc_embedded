@@ -97,6 +97,7 @@ def determine_codegen_type(ep, model_file):
 #         valid_tlc = not tlc in ec_tlc_excludes
 #         return valid_tlc
 
+    if not os.path.isfile(model_file): raise Exception(f"Model file '{model_file}' not found.")
     try:
         # extract model xml content
         temp_dir = extract_slx(model_file)
