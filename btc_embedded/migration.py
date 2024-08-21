@@ -25,7 +25,6 @@ def migration_suite_source(models, matlab_version, toolchain_script=None, test_m
                       additional_stats={ 'toolchainScriptSrc' : os.path.abspath(toolchain_script) })
 
     # clear results folder
-    #shutil.rmtree('results', ignore_errors=True)
     ep = prepare_ep_and_matlab(MIGRATION_PHASE_OLD, matlab_version, toolchain_script, ep)
 
     # run migration source part for all models
@@ -49,6 +48,9 @@ def migration_suite_target(models, matlab_version, model_results=None, accept_in
     reference execution."""
     results = []
     global report_json; report_json = os.path.abspath(os.path.join('results', 'report.json'))
+    
+    if toolchain_script:
+        update_report(additional_stats={ 'toolchainScriptSrc' : os.path.abspath(toolchain_script) })
 
     ep = prepare_ep_and_matlab(MIGRATION_PHASE_NEW, matlab_version, toolchain_script, ep)
 
@@ -233,6 +235,7 @@ def src_02_import_model(ep, model_path, script_path, model_name, matlab_version,
         step_result = { 'stepName' : 'Import Model' }
         toplevel_uid = None
         update_report_running(model_name, step_result)
+        clear_sl_cachefiles(os.path.dirname(model_path))
         ep.post('profiles?discardCurrentProfile=true')
         message=f"Importing {model_name}  with Matlab R{matlab_version}"
 
@@ -340,6 +343,7 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, mod
     try:
         step_result = { 'stepName' : 'Update & Check Interface' }
         update_report_running(model_name, step_result)
+        clear_sl_cachefiles(os.path.dirname(model_path))
 
         # load BTC EmbeddedPlatform profile (*.epp) -> Update Model
         ep.get(f'profiles/{epp_file}?discardCurrentProfile=true')
