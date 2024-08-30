@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 from datetime import datetime
+import time
 from urllib.parse import quote
 
 import btc_embedded.util as util
@@ -46,7 +47,6 @@ def migration_suite_target(models, matlab_version, model_results=None, accept_in
     vectors on MIL and SIL based on the specified Matlab version. This
     regression test will show any changed behavior compared to the provided 
     reference execution."""
-    results = []
     global report_json; report_json = os.path.abspath(os.path.join('results', 'report.json'))
     
     if toolchain_script:
@@ -56,13 +56,12 @@ def migration_suite_target(models, matlab_version, model_results=None, accept_in
 
     # run migration target part for all models and collect results
     for new_model in models:
-        result = migration_target(new_model, matlab_version,
+        migration_target(new_model, matlab_version,
             ep_api_object=ep,
             model_results=model_results,
             accept_interface_changes=accept_interface_changes,
             test_mil=test_mil,
             reuse_code=reuse_code)
-        results.append(result)
 
     # close application and create summary report
     ep.close_application()
@@ -136,7 +135,7 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     script_path = os.path.abspath(new_model['script']) if 'script' in new_model and new_model['script'] else None
     result_dir = os.path.abspath('results')
     message_report_file = quote(os.path.join(result_dir, f'{model_name}_messages.html'))
-    step_results = model_results[model_name] if model_results else []
+    step_results = model_results[model_name] if (model_results and model_name in model_results) else []
     if step_results and 'erDir' in step_results[-1]:
         reference_executions_dir = step_results[-1]['erDir']
     else:
@@ -149,6 +148,9 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     else:
         epp_name_suffix = ('_target' if reference_executions_dir else '')
         epp_file, epp_rel_path = get_epp_file_by_name(result_dir, model_path, suffix=epp_name_suffix)
+    
+    # skip component if epp doesn't exist (e.g. due to error in source part)
+    if not os.path.isfile(epp_file): return None
     
     # start ep or use provided api object
     ep, step_result = src_01_start_ep(ep_api_object, matlab_version, model_name, step_results)
@@ -216,6 +218,7 @@ def migration_test(old_model, old_matlab, new_model=None, new_matlab=None, test_
     return result
 
 def src_01_start_ep(ep_api_object, matlab_version, model_name, results):
+    start_time = time.time()
     # check if the ep api object is controlled externally
     if ep_api_object:
         return ep_api_object, None
@@ -226,11 +229,12 @@ def src_01_start_ep(ep_api_object, matlab_version, model_name, results):
             ep = start_ep_and_configure_matlab(matlab_version, ep_api_object)
             step_result['status'] = 'PASSED'
         except Exception as e:
-            handle_error(ep, step_result, error=e)
+            handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
     return ep, step_result
 
 def src_02_import_model(ep, model_path, script_path, model_name, matlab_version, reuse_code, results):
+    start_time = time.time()
     try:
         step_result = { 'stepName' : 'Import Model' }
         toplevel_uid = None
@@ -266,20 +270,21 @@ def src_02_import_model(ep, model_path, script_path, model_name, matlab_version,
         toplevel_uid = ep.get('scopes')[0]['uid']
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result, error=e)
+        handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
     return toplevel_uid, step_result
 
 def src_03_generate_vectors(ep, toplevel_uid, model_name, results):
+    start_time = time.time()
     try:
         step_result = { 'stepName' : 'Generate Vectors' }
         update_report_running(model_name, step_result)
         vector_gen_settings = {
             'scopeUid' : toplevel_uid,
-            'pllString': 'MCDC',
+            'pllString': 'STM',
             'engineSettings' : {
                 'timeoutSeconds': 300,
-                'engineAtg' : { 'timeoutSecondsPerSubsystem' : 15 },
+                'engineAtg' : { 'timeoutSecondsPerSubsystem' : 100 },
                 'engineCv' : {
                     'coreEngines' : [ { 'name' : 'ISAT' }, { 'name' : 'CBMC' }] ,
                     'maximumNumberOfThreads' : 2
@@ -291,11 +296,12 @@ def src_03_generate_vectors(ep, toplevel_uid, model_name, results):
         print('Coverage ' + "{:.2f}%".format(b2b_coverage['MCDCPropertyCoverage']['handledPercentage']))
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result, error=e)
+        handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
     return step_result
 
 def src_04_reference_simulation(ep, toplevel_uid, test_mil, export_executions, result_dir, model_name, results):
+    start_time = time.time()
     try:
         step_result = { 'stepName' : 'Reference Simulation' }
         update_report_running(model_name, step_result)
@@ -335,11 +341,12 @@ def src_04_reference_simulation(ep, toplevel_uid, test_mil, export_executions, r
             step_result['erDir'] = os.path.join(result_dir, 'ER')
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result, error=e)
+        handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
     return step_result
 
 def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, model_name, accept_interface_changes, matlab_version, results):
+    start_time = time.time()
     try:
         step_result = { 'stepName' : 'Update & Check Interface' }
         update_report_running(model_name, step_result)
@@ -386,11 +393,12 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, mod
             if not accept_interface_changes: raise Exception(warning)
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result, error=e)
+        handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
     return toplevel_uid, step_result
 
 def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, matlab_version, reference_executions_dir, test_mil, reuse_code, results):
+    start_time = time.time()
     try:
         step_result = { 'stepName' : 'Target Profile & Ref Executions Import' }
         update_report_running(model_name, step_result)
@@ -443,22 +451,24 @@ def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, 
         toplevel_uid = ep.get('scopes')[0]['uid']
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result, error=e)
+        handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
     return toplevel_uid, step_result
 
 def tgt_06_tolerances(ep, model_name, results):
+    start_time = time.time()
     try:
         step_result = { 'stepName' : 'Default Tolerances' }
         update_report_running(model_name, step_result)
         tolerance_definition_found = apply_tolerances_from_config(ep)
         step_result['status'] = 'PASSED' if tolerance_definition_found else 'SKIPPED'
     except Exception as e:
-        handle_error(ep, step_result, error=e)
+        handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
     return step_result
 
 def tgt_06_regression_test_sil(ep, model_name, results):
+    start_time = time.time()
     try:
         step_result = { 'stepName' : 'Regression Test (SIL)' }
         update_report_running(model_name, step_result)
@@ -476,11 +486,12 @@ def tgt_06_regression_test_sil(ep, model_name, results):
         print(f"Result: {sil_test['verdictStatus']}")
         step_result['status'] = sil_test['verdictStatus']
     except Exception as e:
-        handle_error(ep, step_result, error=e)
+        handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
     return sil_test, step_result
 
 def tgt_07_regression_test_mil(ep, model_name, results):
+    start_time = time.time()
     try:
         step_result = { 'stepName' : 'Regression Test (MIL)' }
         update_report_running(model_name, step_result)
@@ -499,11 +510,12 @@ def tgt_07_regression_test_mil(ep, model_name, results):
         print(f"Result: {mil_test['verdictStatus']}")
         step_result['status'] = mil_test['verdictStatus']
     except Exception as e:
-        handle_error(ep, step_result, error=e)
+        handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
     return mil_test, step_result
 
 def tgt_08_create_report(ep, toplevel_uid, test_mil, result_dir, model_name, results):
+    start_time = time.time()
     try:
         # Create project report using "regression-test" template
         # and export project report to a file called '{model_name}-migration-test.html'
@@ -521,7 +533,7 @@ def tgt_08_create_report(ep, toplevel_uid, test_mil, result_dir, model_name, res
         ep.post(f"reports/{report['uid']}", { 'exportPath': result_dir, 'newName': f'{model_name}-migration-test' })
         step_result['status'] = 'PASSED'
     except Exception as e:
-        handle_error(ep, step_result, error=e)
+        handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
     return b2b_coverage, step_result
 
@@ -530,14 +542,20 @@ def get_existing_references(execution_record_folder):
     sil_executions = [os.path.abspath(p) for p in glob.glob(f"{execution_record_folder}/SIL/*.mdf")]
     return mil_executions, sil_executions
 
-def handle_error(ep, step_result, epp_file=None, error=""):
+def handle_error(ep, step_result, epp_file=None, error="", step_start_time=None):
     step_result['status'] = 'ERROR'
-    step_result['message'] = f"Error in step '{step_result['stepName']}': {error}"
+    # only show first line of error, prevents ugly long stack traces
+    shortened_error = str(error).split("\n")[0]
+    if len(shortened_error) > 60: shortened_error = shortened_error[0:60] + '...'
+    step_result['message'] = f"Error in step '{step_result['stepName']}': {shortened_error}"
     if epp_file: ep.put('profiles', { 'path': epp_file }, message="Saving profile after error")
     # export messages to {model_name}_messages.html
     global message_report_file
     os.makedirs(os.path.dirname(message_report_file), exist_ok=True)
     ep.post(f'messages/message-report?file-name={quote(message_report_file, safe="")}&marker-date={ep.message_marker_date}')
+    errors_from_log = ep.get_errors_from_log(step_start_time)
+    with open(f"{message_report_file[:-13]}error.log", 'w') as log:
+        log.writelines(errors_from_log)
 
 def start_ep_and_configure_matlab(version, ep):
     if not ep: ep = EPRestApi()

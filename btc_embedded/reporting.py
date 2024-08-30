@@ -22,8 +22,10 @@ def create_report_from_json(json_path):
 def create_test_report_summary(results={}, report_title='BTC Test Report Summary', report_name='BTCTestReportSummary.html', target_dir='.', additional_stats={}):
     """Takes a dict of individual results an creates a summary report including additional metadata stats."""
     def total_duration(results):
-        try: sum(project['duration'] for _, project in results.items() if 'duration' in project or 0)
-        except: return 0
+        try: 
+            return sum(project['duration'] for _, project in results.items() if 'duration' in project or 0)
+        except:
+            return 0
 
     def overall_status(results, additional_stats):
         try:

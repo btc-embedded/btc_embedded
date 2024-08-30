@@ -470,11 +470,11 @@ class EPRestApi:
     def _is_localhost(self):
         return self._HOST_ in [ 'http://localhost', 'http://127.0.0.1']
     
-    def _print_log_entries(self, start_time):
+    def get_errors_from_log(self, start_time):
+        log_entries = []
         if self.log_file_path and os.path.isfile(self.log_file_path):
             # Regular expression pattern to match timestamp lines
             timestamp_pattern = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
-            log_entries = []
             with open(self.log_file_path, 'r') as logfile:
                 current_entry = None
                 for line in logfile:
@@ -501,8 +501,11 @@ class EPRestApi:
                 
                 # add last entry (if any)
                 if current_entry: log_entries.append(current_entry.strip())
-            
-            for entry in log_entries: print(entry)
+
+        return log_entries
+
+    def print_log_entries(self, start_time):
+        for entry in self.get_errors_from_log(start_time): print(entry)
 
 
 # if called directly, starts EP based on the global config
