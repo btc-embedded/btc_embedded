@@ -89,7 +89,7 @@ class EPRestApi:
                 raise Exception("Application didn't respond within the defined timeout.")
             elif (not self._is_ep_process_still_alive()):
                 print(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")
-                self._print_log_entries(start_time)
+                self.print_log_entries(start_time)
                 raise Exception("Application failed to start.")
             time.sleep(2)
             print('.', end='')
