@@ -29,7 +29,19 @@ EXCLUDED_LOG_MESSAGES = [
 
 class EPRestApi:
     #Starter for the EP executable
-    def __init__(self, host='http://localhost', port=1337, version=None, install_root='C:/Program Files/BTC', install_location=None, lic='', config=None, license_location=None, timeout=120, skip_matlab_start=False, skip_config_install=False):
+    def __init__(self,
+        host='http://localhost',
+        port=1337,
+        version=None,
+        install_root='C:/Program Files/BTC',
+        install_location=None,
+        lic='',
+        config=None,
+        license_location=None,
+        additional_vmargs=[],
+        timeout=120,
+        skip_matlab_start=False,
+        skip_config_install=False):
         """
         Wrapper for the BTC EmbeddedPlatform REST API
         - when created without arguments, it uses the default install 
@@ -75,8 +87,8 @@ class EPRestApi:
             version = version or self.config['epVersion']
             install_location = f"{self.config['installationRoot']}/ep{version}"
         if not self._is_rest_service_available():
-            if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic)
-            elif platform.system() == 'Linux': self._start_app_linux(skip_matlab_start)
+            if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, additional_vmargs)
+            elif platform.system() == 'Linux': self._start_app_linux(skip_matlab_start, additional_vmargs)
         else:
             print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
             self._apply_preferences()
@@ -377,7 +389,7 @@ class EPRestApi:
 
     # start commands depending on OS
 
-    def _start_app_linux(self, skip_matlab_start):
+    def _start_app_linux(self, skip_matlab_start, additional_vmargs):
         # container use case -> start EP and Matlab
         try:
             ep_ini_path = os.path.join(os.environ['EP_INSTALL_PATH'], 'ep.ini')
@@ -407,6 +419,7 @@ class EPRestApi:
             '-Dep.runtime.batch=ep',
             '-Dep.runtime.api.port=1109',
             '-Dep.matlab.ip.range=' + matlab_ip ]
+        if additional_vmargs: args.extend(additional_vmargs)
         
         # start ep process
         self.ep_process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -419,7 +432,7 @@ class EPRestApi:
             _, secondary_pty = pty.openpty()
             subprocess.Popen('matlab', stdin=secondary_pty)
 
-    def _start_app_windows(self, version, install_location, port, license_location, lic):
+    def _start_app_windows(self, version, install_location, port, license_location, lic, additional_vmargs):
         headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
         # check if we have what we need
         if not (version and install_location): raise Exception("Cannot start BTC EmbeddedPlatform. Arguments version and install_location or install_root directory must be specified or configured in a config file (installationRoot)")
@@ -454,6 +467,8 @@ class EPRestApi:
             ' -Dep.rest.port=' + self._PORT_
         if license_location or self.config and 'licenseLocation' in self.config:
                 args += f" -Dep.licensing.location={(license_location or self.config['licenseLocation'])}"
+        if additional_vmargs:
+            args += " ".join(additional_vmargs)
         self.ep_process = subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
         self.log_file_path = appdata_location + self._PORT_ + '/logs/current.log'
         self.actively_started = True
