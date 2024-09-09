@@ -99,4 +99,5 @@ USER matlab
 COPY licenses/btc.lic ${LICENSE_LOCATION}
 COPY licenses/matlab.lic ${ML_LIC_PATH}
 
+ENTRYPOINT [ ]
 CMD [ ]
