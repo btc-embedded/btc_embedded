@@ -184,7 +184,10 @@ class EPRestApi:
             if severity: path += ('&' if search_string else '?') + f"severity={severity}"
             try:
                 messages = self.get(path)
-                messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT_MESSAGES))
+                try:
+                    messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT_MESSAGES))
+                except:
+                    messages.sort(key=lambda msg: msg['date'])
                 for msg in messages:
                     print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
                 print("\n")
