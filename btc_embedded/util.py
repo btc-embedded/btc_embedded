@@ -14,6 +14,30 @@ def run_matlab_script(ep, matlab_script_abs_path):
         },
         message=f"Evaluating '{matlab_script_abs_path}' in Matlab base workspace.")
 
+def run_matlab_function(ep, matlab_script_abs_path, args=[]):
+    """Adds the script's parent directory to the matlab path,
+    then executes the script with the given arguments.
+
+    If you want to simply run a function that is already known to Matlab,
+    please use ep.post('execute-long-matlab-script') directly."""
+    if not (matlab_script_abs_path[:-2] == '.m') and (os.path.isabs(matlab_script_abs_path)):
+        raise Exception(f"Expecting absolute path to a matlab script file (*.m) but received '{matlab_script_abs_path}'")
+    
+    # add m-script's parent dir to matlab path
+    script_dir, script_file = os.path.split(matlab_script_abs_path)
+    script_name = script_file[:-2]
+    ep.post('execute-short-matlab-script',
+        {
+            'scriptName' : 'addpath',
+            'inArgs' : [ script_dir ]
+        })
+    
+    # execute script with arguments
+    ep.post('execute-long-matlab-script',
+        {
+            'scriptName' : script_name,
+            'inArgs' : args
+        })
 
 def print_rbt_results(response, coverage_response=None):
     """Example on how to access coverage and test result data.
