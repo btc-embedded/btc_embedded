@@ -256,8 +256,8 @@ def dump_testresults_junitxml(
             # Test Suite Name (e.g. "Requirements-based Tests MIL" or "Requirements-based Tests SIL")
             suite_name = f"Requirements-based Tests {execution_config}"
             testsuite = ET.SubElement(testsuites, 'testsuite', name=suite_name)
-            ts_tests = ts_tests = ts_errors = ts_failures = ts_skipped = 0
             for test_result in rbt_response['testResults']:
+                ts_tests = ts_tests = ts_errors = ts_failures = ts_skipped = 0
                 tc_name = tcs_by_uid[test_result['rbTestCaseUID']]['name'] if tcs_by_uid else test_result['rbTestCaseUID']
                 scope_uid = tcs_by_uid[test_result['rbTestCaseUID']]['scopeUID'] if tcs_by_uid else None
                 classname = scopes_by_uid[scope_uid]['path'] if scope_uid else ""

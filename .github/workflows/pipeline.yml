@@ -27,6 +27,7 @@ jobs:
         python test/test.py test/test.epp
 
   test-docker:
+    needs: [ test-windows ]
     runs-on: self-hosted
     if: ${{ contains(github.event.head_commit.message, '#test-docker') || contains(github.event.head_commit.message, '#release') }}
 
@@ -51,6 +52,15 @@ jobs:
             --workdir "/workdir" `
             ep-ml:24.2_23b `
             sh -c "pip3 install . && python3 test/test.py test/test.epp"
+
+    - name: Publish results
+      uses: dorny/test-reporter@v1
+      if: success() || failure()
+      with:
+        name: Test results
+        path: test/test_results.xml
+        reporter: jest-junit
+        only-summary: 'false'
 
   deploy:
     needs: [ test-windows, test-docker ]
