@@ -20,7 +20,7 @@ def run_matlab_function(ep, matlab_script_abs_path, args=[]):
 
     If you want to simply run a function that is already known to Matlab,
     please use ep.post('execute-long-matlab-script') directly."""
-    if not (matlab_script_abs_path[:-2] == '.m') and (os.path.isabs(matlab_script_abs_path)):
+    if not (matlab_script_abs_path[-2:] == '.m') and (os.path.isabs(matlab_script_abs_path)):
         raise Exception(f"Expecting absolute path to a matlab script file (*.m) but received '{matlab_script_abs_path}'")
     
     # add m-script's parent dir to matlab path
