@@ -79,11 +79,19 @@ def get_vector_gen_config(scope_uid, config=None):
 
 def get_config_path_from_resources():
     if platform.system() == 'Windows':
-        return str(os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config_windows.yml'))
-    elif platform.system() == 'Linux':
-        return str(os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config_linux.yml'))
+        return __get_resource_path('btc_config_windows.yml')
     else:
-        raise Exception(f"Unsupported OS: {platform.system()} (only Linux and Windows are supported)")
+        return __get_resource_path('btc_config_linux.yml')
+
+def __get_resource_path(filename):
+    try:
+        # main approach
+        return str(os.path.join(resources.files('btc_embedded'), 'resources', filename))
+    except:
+        # fallback for Python 3.8 and older
+        with resources.path('btc_embedded', 'resources') as resource_dir:
+            return os.path.join(resource_dir, filename)
+    
 
 def __load_config(config_file):
     """Attemps to load a config from the specified yaml file.
