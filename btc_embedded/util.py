@@ -256,6 +256,9 @@ def dump_testresults_junitxml(
             # Test Suite Name (e.g. "Requirements-based Tests MIL" or "Requirements-based Tests SIL")
             suite_name = f"Requirements-based Tests {execution_config}"
             testsuite = ET.SubElement(testsuites, 'testsuite', name=suite_name)
+
+            # sort by tc name
+            rbt_response['testResults'].sort(key=lambda item: tcs_by_uid[item['rbTestCaseUID']]['name'])
             for test_result in rbt_response['testResults']:
                 ts_tests = ts_tests = ts_errors = ts_failures = ts_skipped = 0
                 tc_name = tcs_by_uid[test_result['rbTestCaseUID']]['name'] if tcs_by_uid else test_result['rbTestCaseUID']
@@ -291,7 +294,7 @@ def dump_testresults_junitxml(
     # 2. Create B2B Test Suite
     if b2b_result:
         b2b_testsuite = ET.SubElement(testsuites, 'testsuite', name=f"B2B Test {b2b_result['referenceMode']} vs. {b2b_result['comparisonMode']}")
-        classname = scopes_by_uid[scopes[0]['uid']]['path'] if scope_uid else ""
+        classname = scopes[0]['path']
         add_testcase(
             b2b_testsuite,
             name=f"B2B Test {b2b_result['referenceMode']} vs. {b2b_result['comparisonMode']}",
@@ -310,7 +313,7 @@ def dump_testresults_junitxml(
     # 3. Create Regression Test Suite
     if regression_results:
         regression_testsuite = ET.SubElement(testsuites, 'testsuite', name="Regression Tests")
-        classname = scopes_by_uid[scopes[0]['uid']]['path'] if scope_uid else ""
+        classname = scopes[0]['path']
         for regression_result in regression_results:
             total_tests += 1
             regression_testsuite.set('tests', '1')
