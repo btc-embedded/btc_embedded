@@ -42,7 +42,9 @@ jobs:
         New-Item -ItemType Directory -Path "${{github.workspace}}/test/licenses" -Force
         $env:ML_LIC_CONTENT | Out-File -FilePath "${{github.workspace}}/test/licenses/matlab.lic" -Encoding UTF8
         $env:BTC_LIC_CONTENT | Out-File -FilePath "${{github.workspace}}/test/licenses/btc.lic" -Encoding UTF8
-        docker build -t ep-ml:24.2_23b test
+        if (!(docker images -q ep-ml:24.2_23b)) {
+          docker build -t ep-ml:24.2_23b test
+        }
       env:
         ML_LIC_CONTENT: ${{ secrets.ML_LICENSE }}
         BTC_LIC_CONTENT: ${{ secrets.BTC_LICENSE }}
