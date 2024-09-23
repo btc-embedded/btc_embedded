@@ -331,7 +331,7 @@ class EPRestApi:
         if not (version and install_location) and 'installationRoot' in self.config and 'epVersion' in self.config:
             version = version or self.config['epVersion']
             install_location = f"{self.config['installationRoot']}/ep{version}"
-        self._set_log_file_location()
+        self._set_log_file_location(version)
 
     # extracts the response object which can be nested in different ways
     def _extract_result(self, response):
