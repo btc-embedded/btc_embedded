@@ -312,6 +312,7 @@ class EPRestApi:
         self.ep_process = None
         self.config = None
         self.start_time = time.time()
+        self.version = version
 
         # use default config, if no config was specified
         if config:
@@ -323,15 +324,15 @@ class EPRestApi:
         # apply timeout from config if specified
         if 'startupTimeout' in self.config: timeout = self.config['startupTimeout']
         # set install location based on install_root and version if set explicitly
-        if version and install_root: install_location = f"{install_root}/ep{version}"
-        if install_location and not version:
+        if self.version and install_root: install_location = f"{install_root}/ep{self.version}"
+        if install_location and not self.version:
             match = re.search(VERSION_PATTERN, install_location)
-            if match: version = match.group(1)
+            if match: self.version = match.group(1)
         # fallback: determine based on config
-        if not (version and install_location) and 'installationRoot' in self.config and 'epVersion' in self.config:
-            version = version or self.config['epVersion']
-            install_location = f"{self.config['installationRoot']}/ep{version}"
-        self._set_log_file_location(version)
+        if not (self.version and install_location) and 'installationRoot' in self.config and 'epVersion' in self.config:
+            self.version = self.version or self.config['epVersion']
+            install_location = f"{self.config['installationRoot']}/ep{self.version}"
+        self._set_log_file_location(self.version)
 
     # extracts the response object which can be nested in different ways
     def _extract_result(self, response):
