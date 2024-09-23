@@ -258,7 +258,7 @@ def dump_testresults_junitxml(
             testsuite = ET.SubElement(testsuites, 'testsuite', name=suite_name)
 
             # sort by tc name
-            rbt_response['testResults'].sort(key=lambda item: tcs_by_uid[item['rbTestCaseUID']]['name'])
+            rbt_response['testResults'].sort(key=lambda item: tcs_by_uid[item['rbTestCaseUID']]['name'] if tcs_by_uid else item['rbTestCaseUID'])
             for test_result in rbt_response['testResults']:
                 ts_tests = ts_tests = ts_errors = ts_failures = ts_skipped = 0
                 tc_name = tcs_by_uid[test_result['rbTestCaseUID']]['name'] if tcs_by_uid else test_result['rbTestCaseUID']

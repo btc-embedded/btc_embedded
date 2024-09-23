@@ -43,70 +43,36 @@ class EPRestApi:
         skip_matlab_start=False,
         skip_config_install=False):
         """
-        Wrapper for the BTC EmbeddedPlatform REST API
-        - when created without arguments, it uses the default install 
-        location & version defined in the global config (btc_config.yml)
-        - the global config is identified by the BTC_API_CONFIG_FILE 
-        env variable or uses the btc_config.yml file shipped with this module as a fallback
-        
-        Parameters (all optional):
-        - host: a valid hostname or IP address to connect to the BTC EmbeddedPlatform API (default: 'http://localhost')
-        - port: the port to use to communicate with the BTC EmbeddedPlatform API (default: 1337)
-        - version: the BTC EmbeddedPlatform API (like '24.2p0', default: determined automatically)
-        - install_root: root directory of the BTC installation (default: 'C:/Program Files/BTC')
-        - install_location: alternative way to specify the BTC executable (default: determined automatically)
-        - lic can optionally be defined to select a license package (e.g. lic='ET_BASE' to only use EmbeddedTester BASE)
-        - license_location should point to the flexnet license server serving the btc licenses
-        - config: you can pass in a config object to override settings of the global configuration with project specific values
-        - timeout: timeout in seconds to start up BTC EmbeddedPlatform (default: 120)
-        - skip_config_install: skips the automatic installation of a global btc_config.yml on your machine (default: False)
-        - skip_matlab_start: only relevant in Docker-based use cases where Matlab is available but shall not be started (default: False)
+        Wrapper for the BTC EmbeddedPlatform REST API.
+        When created without arguments, it uses the default install location & version defined in the global config (btc_config.yml).
+        The global config is identified by the BTC_API_CONFIG_FILE environment variable or uses the btc_config.yml file shipped with this module as a fallback.
+        - host (str): A valid hostname or IP address to connect to the BTC EmbeddedPlatform API (default: 'http://localhost').
+        - port (int): The port to use to communicate with the BTC EmbeddedPlatform API (default: 1337).
+        - version (str): The BTC EmbeddedPlatform API version (e.g., '24.2p0', default: determined automatically).
+        - install_root (str): Root directory of the BTC installation (default: 'C:/Program Files/BTC').
+        - install_location (str): Alternative way to specify the BTC executable (default: determined automatically).
+        - lic (str): License package to select (e.g., 'ET_BASE' to only use EmbeddedTester BASE).
+        - config (dict): Config object to override settings of the global configuration with project-specific values.
+        - license_location (str): Path to the FlexNet license server serving the BTC licenses.
+        - additional_vmargs (list): Additional VM arguments.
+        - timeout (int): Timeout in seconds to start up BTC EmbeddedPlatform (default: 120).
+        - skip_matlab_start (bool): Relevant in Docker-based use cases where Matlab is available but shall not be started (default: False).
+        - skip_config_install (bool): Skips the automatic installation of a global btc_config.yml on your machine (default: False).
         """
-        self._PORT_ = "8080" if platform.system() == 'Linux' else str(port)
-        self._HOST_ = host
-        self.definitively_closed = False
-        self.actively_started = False
-        self.ep_process = None
-        self.config = None
-        # use default config, if no config was specified
-        if config:
-            self.config = config
+        self._initialize_fields(host, port, config, skip_config_install, install_root, version)
+        if self._is_rest_service_available():
+            # connect to a running application
+            print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
         else:
-            if platform.system() == 'Windows' and self._is_localhost() and not skip_config_install:
-                install_btc_config()
-            self.config = get_global_config()
-        # apply timeout from config if specified
-        if 'startupTimeout' in self.config: timeout = self.config['startupTimeout']
-        # set install location based on install_root and version if set explicitly
-        if version and install_root: install_location = f"{install_root}/ep{version}"
-        if install_location and not version:
-            match = re.search(VERSION_PATTERN, install_location)
-            if match: version = match.group(1)
-        # fallback: determine based on config
-        if not (version and install_location) and 'installationRoot' in self.config and 'epVersion' in self.config:
-            version = version or self.config['epVersion']
-            install_location = f"{self.config['installationRoot']}/ep{version}"
-        if not self._is_rest_service_available():
+            # start the application
             if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, additional_vmargs)
             elif platform.system() == 'Linux': self._start_app_linux(skip_matlab_start, additional_vmargs)
-        else:
-            print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
-            self._apply_preferences()
-            return
-        start_time = time.time()
-        print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
-        while not self._is_rest_service_available():
-            if (time.time() - start_time) > timeout:
-                print(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
-                raise Exception("Application didn't respond within the defined timeout.")
-            elif (not self._is_ep_process_still_alive()):
-                print(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")
-                self.print_log_entries(start_time)
-                raise Exception("Application failed to start.")
-            time.sleep(2)
-            print('.', end='')
-        print('\nBTC EmbeddedPlatform has started.')
+            
+            print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
+            self._connect_within_timeout(timeout)
+            print('\nBTC EmbeddedPlatform has started.')
         self._apply_preferences()
+        
 
     # - - - - - - - - - - - - - - - - - - - - 
     #   PUBLIC FUNCTIONS
@@ -114,6 +80,7 @@ class EPRestApi:
 
     # closes the application
     def close_application(self):
+        """Closes the BTC EmbeddedPlatform application"""
         self.delete('application?force-quit=true')
         start_time = time.time()
         if self.ep_process:
@@ -143,13 +110,35 @@ class EPRestApi:
     # wrapper directly returns the relevant object if possible
     def put(self, urlappendix, requestBody=None, message=None):
         """Returns the result object, or the response, if no result object is available."""
-        try:
-            response = self.put_req(urlappendix, requestBody, message)
-        except Exception as e:
-            self.print_messages()
-            print("\n")
-            raise e
+        response = self.put_req(urlappendix, requestBody, message)
         return self._extract_result(response)
+
+    def _handle_error(self, e):
+        """
+        Handles an exception by printing the error message and the messages from the API.
+        Args:
+            e (Exception): The exception that was encountered.
+        Behavior:
+            - Prints the encountered error message.
+            - Retrieves and prints messages from the API, if any.
+            - Retrieves and prints errors from the log file, if any.
+            - Re-raises the encountered exception.
+        """
+        print(f"\n\nEncountered error: {e}\n\n")
+        
+        messages = self.get_messages()
+        if messages:
+            print(f"\n\Messages: \n\n")
+            for msg in messages:
+                print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
+
+        logged_errors = self.get_errors_from_log()
+        if logged_errors:
+            print(f"\n\nErrors from log file{e}\n\n")
+            for entry in self.get_errors_from_log(self.start_time): print(entry)
+
+        print(f"\n\nEncountered error: {e}\n\n")
+        raise e
 
     # wrapper directly returns the relevant object if possible
     def delete(self, urlappendix, message=None):
@@ -157,8 +146,15 @@ class EPRestApi:
         return self.delete_req(urlappendix, message)
 
     def set_compiler(self, config=None, value=None):
-        """Sets the configured compiler. If no config object is passed in, the default config will be used.
-        For Linux/Docker based scenarios, the config has no effect."""
+        """
+        Sets the configured compiler. If no config object is passed in, the default config will be used.
+        For Linux/Docker based scenarios, the config has no effect.
+        Parameters:
+        config (dict, optional): Configuration dictionary that may contain the compiler setting.
+        value (str, optional): The compiler value to be set.
+        Raises:
+        Exception: If an error occurs during the setting of the compiler, it is caught and passed silently.
+        """
         try:
             if not value and not (config and 'compiler' in config):
                 config = self.config
@@ -178,6 +174,20 @@ class EPRestApi:
         
         - severity: INFO, WARNING, ERROR or CRITICAL
         - search_string: only prints messages that contain the given string"""
+        messages = self.get_messages(search_string, severity)
+        for msg in messages:
+            print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
+        print("\n")
+    
+    def get_messages(self, search_string=None, severity=None):
+        """Returns all messages since the last profile create/profile load.
+        Optional filters are available:
+        - severity: INFO, WARNING, ERROR or CRITICAL
+        - search_string: only prints messages that contain the given string
+        
+        Returns a list of message objects with date, severity, message and hint
+        """
+        messages = []
         if hasattr(self, 'message_marker_date') and self.message_marker_date:
             path = f"/message-markers/{self.message_marker_date}/messages"
             if search_string: path += '?search-string=' + search_string
@@ -188,11 +198,9 @@ class EPRestApi:
                     messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT_MESSAGES))
                 except:
                     messages.sort(key=lambda msg: msg['date'])
-                for msg in messages:
-                    print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
-                print("\n")
             except:
                 pass
+        return messages
 
     # - - - - - - - - - - - - - - - - - - - - 
     #   DEPRICATED PUBLIC FUNCTIONS
@@ -202,14 +210,20 @@ class EPRestApi:
     def get_req(self, urlappendix, message=None):
         """Public access to this method is DEPRICATED. Use get() instead, unless you want to get the raw http response"""
         url = self._precheck_get(urlappendix, message)
-        response = requests.get(self._url(url))
+        try:
+            response = requests.get(self._url(url))
+        except Exception as e:
+            self._handle_error(e)
         return self._check_long_running(response)
     
     # Performs a delete request on the given url extension
     def delete_req(self, urlappendix, message=None):
         """Public access to this method is DEPRICATED. Use delete() instead, unless you want to get the raw http response"""
         if message: print(message)
-        response = requests.delete(self._url(urlappendix), headers=HEADERS)
+        try:
+            response = requests.delete(self._url(urlappendix), headers=HEADERS)
+        except Exception as e:
+            self._handle_error(e)
         return self._check_long_running(response)
 
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
@@ -224,9 +238,7 @@ class EPRestApi:
             else:
                 response = requests.post(self._url(url), json=requestBody, headers=HEADERS)
         except Exception as e:
-            self.print_messages()
-            print("\n")
-            raise e
+            self._handle_error(e)
         return self._check_long_running(response)
 
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
@@ -234,16 +246,83 @@ class EPRestApi:
         """Public access to this method is DEPRICATED. Use put() instead, unless you want to get the raw http response"""
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
         if message: print(message)
-        if requestBody == None:
-            response = requests.put(self._url(url), headers=HEADERS)
-        else:
-            response = requests.put(self._url(url), json=requestBody, headers=HEADERS)
+        try:
+            if requestBody == None:
+                response = requests.put(self._url(url), headers=HEADERS)
+            else:
+                response = requests.put(self._url(url), json=requestBody, headers=HEADERS)
+        except Exception as e:
+            self._handle_error(e)
         return self._check_long_running(response)
 
 
     # - - - - - - - - - - - - - - - - - - - - 
     #   PRIVATE HELPER FUNCTIONS
     # - - - - - - - - - - - - - - - - - - - - 
+
+    def _connect_within_timeout(self, timeout):
+        """Waits until the REST service is available or the timeout is reached. Frequently checks if the EP process is still alive."""
+        while not self._is_rest_service_available():
+            if (time.time() - self.start_time) > timeout:
+                print(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
+                raise Exception("Application didn't respond within the defined timeout.")
+            elif (not self._is_ep_process_still_alive()):
+                print(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")
+                self.print_log_entries()
+                raise Exception("Application failed to start.")
+            time.sleep(2)
+            print('.', end='')
+
+    def _initialize_fields(self, host, port, config, skip_config_install, install_root, version):
+        """
+        Initializes the fields for the instance.
+
+        Args:
+            host (str): The host address.
+            port (int): The port number.
+            config (dict): The configuration dictionary.
+            skip_config_install (bool): Flag to skip configuration installation.
+            install_root (str): The root directory for installation.
+            version (str): The version of the software.
+
+        Sets:
+            self._PORT_ (str): The port number as a string.
+            self._HOST_ (str): The host address.
+            self.definitively_closed (bool): Flag indicating if the instance is definitively closed.
+            self.actively_started (bool): Flag indicating if the instance is actively started.
+            self.ep_process (None): Placeholder for the process.
+            self.config (dict): The configuration dictionary.
+            self.start_time (float): The start time of the instance.
+            install_location (str): The installation location.
+            version (str): The version of the software.
+        """
+        self._PORT_ = "8080" if platform.system() == 'Linux' else str(port)
+        self._HOST_ = host
+        self.definitively_closed = False
+        self.actively_started = False
+        self.ep_process = None
+        self.config = None
+        self.start_time = time.time()
+
+        # use default config, if no config was specified
+        if config:
+            self.config = config
+        else:
+            if platform.system() == 'Windows' and self._is_localhost() and not skip_config_install:
+                install_btc_config()
+            self.config = get_global_config()
+        # apply timeout from config if specified
+        if 'startupTimeout' in self.config: timeout = self.config['startupTimeout']
+        # set install location based on install_root and version if set explicitly
+        if version and install_root: install_location = f"{install_root}/ep{version}"
+        if install_location and not version:
+            match = re.search(VERSION_PATTERN, install_location)
+            if match: version = match.group(1)
+        # fallback: determine based on config
+        if not (version and install_location) and 'installationRoot' in self.config and 'epVersion' in self.config:
+            version = version or self.config['epVersion']
+            install_location = f"{self.config['installationRoot']}/ep{version}"
+        self._set_log_file_location()
 
     # extracts the response object which can be nested in different ways
     def _extract_result(self, response):
@@ -261,6 +340,12 @@ class EPRestApi:
 
     # Checks if the REST Server is available
     def _is_rest_service_available(self):
+        """
+        Checks if the REST service is available by sending a GET request to the '/test' endpoint.
+
+        Returns:
+            bool: True if the service is available (response status code is 200-299), False otherwise.
+        """
         try:
             response = requests.get(self._url('/test'))
         except requests.exceptions.ConnectionError:
@@ -273,13 +358,28 @@ class EPRestApi:
 
     # This method is used to poll a request until the progress is done.
     def _check_long_running(self, response):
+        """
+        Checks the status of a long-running operation and handles errors.
+
+        Args:
+            response (requests.Response): The initial response object to check.
+
+        Returns:
+            requests.Response: The final response object after the long-running operation completes.
+
+        Raises:
+            Exception: If the response contains an error message not in the excluded list.
+
+        Behavior:
+            - If the response is not OK and contains an error message not in the excluded list, it prints the error message, calls `self.print_messages()`, and raises an Exception.
+            - If the response status code is 202 (Accepted), it polls the long-running operation using the job ID until the status code is no longer 202.
+        """
         if not response.ok:
             response_content = response.content.decode('utf-8')
             # if the error is none of the excluded messages -> print messages, etc.
             if all(msg not in response_content for msg in EXCLUDED_ERROR_MESSAGES):
                 print(f"\n\nError: {response_content}\n\n")
-                self.print_messages()
-                raise Exception(response_content)
+                self._handle_error(Exception(response_content))
         if response.status_code == 202:
             jsonResponse = response.json()
             for key, value in jsonResponse.items():
@@ -293,6 +393,13 @@ class EPRestApi:
 
     def _poll_long_running(self, jobID):
         return self.get_req('/progress?progress-id=' + jobID)
+
+    def _set_log_file_location(self, version):
+        if platform.system() == 'Windows':
+            appdata_location = os.environ['APPDATA'].replace('\\', '/') + f"/BTC/ep/{version}/"
+            self.log_file_path = os.path.join(appdata_location, self._PORT_, 'logs', 'current.log')
+        elif platform.system() == 'Linux':
+            self.log_file_path = os.path.join(os.environ['LOG_DIR'], 'current.log')
 
     def _apply_preferences(self):
         """Applies the preferences defined in the config object"""
@@ -353,10 +460,11 @@ class EPRestApi:
         return None
     
     def _precheck_post(self, urlappendix):
-        # create message marker 
+        """Sets the message marker date if the url appendix starts with 'profiles'."""
         if urlappendix[:8] == 'profiles': self.message_marker_date = self.post('message-markers')['date']
             
     def _precheck_get(self, urlappendix, message):
+        """Prepares the URL appendix and sets the message marker date if the url appendix starts with 'profiles'."""
         if not 'progress' in urlappendix:
             # print this unless it's a progress query (to avoid flooding the console)
             if message: print(message)
@@ -369,7 +477,7 @@ class EPRestApi:
             path = urlappendix[9:index_qmark] if index_qmark > 0 else urlappendix[9:]
             suffix = urlappendix[index_qmark:] if index_qmark > 0 else ""
             path = unquote(path) # unquote incase caller already quoted the path
-            if not os.path.isfile(path) and self._is_localhost():
+            if path and not os.path.isfile(path) and self._is_localhost():
                 print(f"\nThe profile '{path}' cannot be found. Please ensure that the file is available.\n")
                 exit(1)
             path = quote(path, safe="")
@@ -378,6 +486,19 @@ class EPRestApi:
         return url_combined
 
     def _is_rest_addon_installed(self, version):
+        """
+        Checks if the REST addon is installed for a given version of the BTC EmbeddedPlatform.
+
+        This method attempts to open specific registry keys to determine if any of the REST addons
+        ('REST_Server_EU', 'REST_Server_BASE_EU', 'REST_Server_JP') are installed for the specified
+        version of the BTC EmbeddedPlatform.
+
+        Args:
+            version (str): The version of the BTC EmbeddedPlatform to check for the REST addon.
+
+        Returns:
+            bool: True if any of the REST addons are installed, False otherwise.
+        """
         import winreg
         keys = [ 'REST_Server_EU', 'REST_Server_BASE_EU', 'REST_Server_JP' ]
         for key in keys:
@@ -426,7 +547,6 @@ class EPRestApi:
         
         # start ep process
         self.ep_process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        self.log_file_path = os.environ['LOG_DIR'] + '/current.log'
         self.actively_started = True
         
         # if container has matlab -> assume that this shall be started as well
@@ -473,22 +593,48 @@ class EPRestApi:
         if additional_vmargs:
             args += " ".join(additional_vmargs)
         self.ep_process = subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-        self.log_file_path = appdata_location + self._PORT_ + '/logs/current.log'
         self.actively_started = True
 
     def _does_api_support_signalinfo(self):
+        """
+        Checks if the current EP version supports querying signal info details.
+
+        This method sends a GET request to the endpoint for signal datatype information.
+        It determines support by checking if the response content contains the phrase 'No signal'.
+
+        Returns:
+            bool: True if the API call is supported, False otherwise.
+        """
         # check if the current EP version supports querying signal info details
         r = requests.get(self._url('signals/UNDEFINED/signal-datatype-information'))
         api_call_supported = (b'No signal' in r.content)
         return api_call_supported
 
     def _is_ep_process_still_alive(self):
+        """
+        Check if the external process is still running.
+
+        This method checks if the external process (`ep_process`) is still alive by 
+        verifying that the process exists and has not terminated.
+
+        Returns:
+            bool: True if the external process is still running, False otherwise.
+        """
         return self.ep_process and self.ep_process.poll() is None
 
     def _is_localhost(self):
         return self._HOST_ in [ 'http://localhost', 'http://127.0.0.1']
     
-    def get_errors_from_log(self, start_time):
+    def get_errors_from_log(self, start_time=None):
+        """
+        Extracts error log entries from a log file starting from a given time.
+        Args:
+            start_time (float, optional): The start time in Unix timestamp format (e.g. time.time() ). 
+                                          If provided, only log entries after this time will be considered. 
+                                          Defaults to None.
+        Returns:
+            list: A list of error log entries as strings. Each entry includes the timestamp and the error message.
+        """
         log_entries = []
         if self.log_file_path and os.path.isfile(self.log_file_path):
             # Regular expression pattern to match timestamp lines
@@ -503,8 +649,9 @@ class EPRestApi:
                         # start new entry if time matches
                         timestamp_str = timestamp_pattern_match.group(0)
                         timestamp = datetime.strptime(timestamp_str, DATE_FORMAT_LOGFILE)
-                        # create bools for readability
-                        is_recent = timestamp > datetime.fromtimestamp(start_time)
+                        # create bools for readability:
+                        # - recent = no start_time or timestamp > start_time
+                        is_recent = not start_time or timestamp > datetime.fromtimestamp(start_time)
                         is_error = 'ERROR' in line.upper()
                         is_not_excluded = not any(bad_string in line for bad_string in EXCLUDED_LOG_MESSAGES)
                         # check if line is relevant
@@ -522,8 +669,8 @@ class EPRestApi:
 
         return log_entries
 
-    def print_log_entries(self, start_time):
-        for entry in self.get_errors_from_log(start_time): print(entry)
+    def print_log_entries(self):
+        for entry in self.get_errors_from_log(self.start_time): print(entry)
 
 
 # if called directly, starts EP based on the global config
