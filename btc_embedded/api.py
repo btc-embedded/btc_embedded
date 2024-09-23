@@ -59,7 +59,15 @@ class EPRestApi:
         - skip_matlab_start (bool): Relevant in Docker-based use cases where Matlab is available but shall not be started (default: False).
         - skip_config_install (bool): Skips the automatic installation of a global btc_config.yml on your machine (default: False).
         """
-        self._initialize_fields(host, port, config, skip_config_install, install_root, version)
+        self._initialize_fields(
+            host=host,
+            port=port,
+            config=config,
+            skip_config_install=skip_config_install,
+            install_root=install_root,
+            install_location=install_location,
+            version=version
+        )
         if self._is_rest_service_available():
             # connect to a running application
             print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
@@ -273,7 +281,7 @@ class EPRestApi:
             time.sleep(2)
             print('.', end='')
 
-    def _initialize_fields(self, host, port, config, skip_config_install, install_root, version):
+    def _initialize_fields(self, host, port, config, skip_config_install, install_root, install_location, version):
         """
         Initializes the fields for the instance.
 
@@ -283,6 +291,7 @@ class EPRestApi:
             config (dict): The configuration dictionary.
             skip_config_install (bool): Flag to skip configuration installation.
             install_root (str): The root directory for installation.
+            install_location (str): The installation location.
             version (str): The version of the software.
 
         Sets:
