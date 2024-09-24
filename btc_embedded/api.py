@@ -59,15 +59,38 @@ class EPRestApi:
         - skip_matlab_start (bool): Relevant in Docker-based use cases where Matlab is available but shall not be started (default: False).
         - skip_config_install (bool): Skips the automatic installation of a global btc_config.yml on your machine (default: False).
         """
-        self._initialize_fields(
-            host=host,
-            port=port,
-            config=config,
-            skip_config_install=skip_config_install,
-            install_root=install_root,
-            install_location=install_location,
-            version=version
-        )
+        self._PORT_ = "8080" if platform.system() == 'Linux' else str(port)
+        self._HOST_ = host
+        self.definitively_closed = False
+        self.actively_started = False
+        self.ep_process = None
+        self.config = None
+        self.start_time = time.time()
+
+        #
+        # Prepare configuration
+        #
+        if config: self.config = config
+        else: # default to global config
+            if platform.system() == 'Windows' and self._is_localhost() and not skip_config_install:
+                install_btc_config()
+            self.config = get_global_config()
+        # apply timeout from config if specified
+        if 'startupTimeout' in self.config: timeout = self.config['startupTimeout']
+        # set install location based on install_root and version if set explicitly
+        if version and install_root: install_location = f"{install_root}/ep{version}"
+        if install_location and not version:
+            match = re.search(VERSION_PATTERN, install_location)
+            if match: version = match.group(1)
+        # fallback: determine based on config
+        if not (version and install_location) and 'installationRoot' in self.config and 'epVersion' in self.config:
+            version = version or self.config['epVersion']
+            install_location = f"{self.config['installationRoot']}/ep{version}"
+        self._set_log_file_location(version)
+
+        #
+        # Start / Connect to the BTC EmbeddedPlatform
+        #
         if self._is_rest_service_available():
             # connect to a running application
             print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
@@ -281,58 +304,6 @@ class EPRestApi:
             time.sleep(2)
             print('.', end='')
 
-    def _initialize_fields(self, host, port, config, skip_config_install, install_root, install_location, version):
-        """
-        Initializes the fields for the instance.
-
-        Args:
-            host (str): The host address.
-            port (int): The port number.
-            config (dict): The configuration dictionary.
-            skip_config_install (bool): Flag to skip configuration installation.
-            install_root (str): The root directory for installation.
-            install_location (str): The installation location.
-            version (str): The version of the software.
-
-        Sets:
-            self._PORT_ (str): The port number as a string.
-            self._HOST_ (str): The host address.
-            self.definitively_closed (bool): Flag indicating if the instance is definitively closed.
-            self.actively_started (bool): Flag indicating if the instance is actively started.
-            self.ep_process (None): Placeholder for the process.
-            self.config (dict): The configuration dictionary.
-            self.start_time (float): The start time of the instance.
-            install_location (str): The installation location.
-            version (str): The version of the software.
-        """
-        self._PORT_ = "8080" if platform.system() == 'Linux' else str(port)
-        self._HOST_ = host
-        self.definitively_closed = False
-        self.actively_started = False
-        self.ep_process = None
-        self.config = None
-        self.start_time = time.time()
-        self.version = version
-
-        # use default config, if no config was specified
-        if config:
-            self.config = config
-        else:
-            if platform.system() == 'Windows' and self._is_localhost() and not skip_config_install:
-                install_btc_config()
-            self.config = get_global_config()
-        # apply timeout from config if specified
-        if 'startupTimeout' in self.config: timeout = self.config['startupTimeout']
-        # set install location based on install_root and version if set explicitly
-        if self.version and install_root: install_location = f"{install_root}/ep{self.version}"
-        if install_location and not self.version:
-            match = re.search(VERSION_PATTERN, install_location)
-            if match: self.version = match.group(1)
-        # fallback: determine based on config
-        if not (self.version and install_location) and 'installationRoot' in self.config and 'epVersion' in self.config:
-            self.version = self.version or self.config['epVersion']
-            install_location = f"{self.config['installationRoot']}/ep{self.version}"
-        self._set_log_file_location(self.version)
 
     # extracts the response object which can be nested in different ways
     def _extract_result(self, response):
