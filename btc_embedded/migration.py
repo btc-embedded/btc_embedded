@@ -2,8 +2,8 @@ import glob
 import json
 import os
 import shutil
-from datetime import datetime
 import time
+from datetime import datetime
 from urllib.parse import quote
 
 import btc_embedded.util as util
@@ -83,6 +83,7 @@ def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=No
     result_dir = os.path.abspath('results')
     message_report_file = os.path.join(result_dir, f'{model_name}_messages.html')
     epp_file, epp_rel_path = get_epp_file_by_name(result_dir, model_path)
+    if not model_results == None: model_results[model_name] = step_results
     
     # start ep or use provided api object
     ep, step_result = src_01_start_ep(ep_api_object, matlab_version, model_name, step_results)
@@ -116,7 +117,6 @@ def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=No
         'info' : f"Migration Source step completed.",
         'duration' : duration_seconds
     })
-    if not model_results == None: model_results[model_name] = step_results
 
     return epp_file
 
