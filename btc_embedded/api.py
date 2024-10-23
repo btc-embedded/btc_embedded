@@ -78,7 +78,7 @@ class EPRestApi:
         # apply timeout from config if specified
         if 'startupTimeout' in self.config: timeout = self.config['startupTimeout']
         # set install location based on install_root and version if set explicitly
-        if version and install_root: install_location = f"{install_root}/ep{version}"
+        if version and install_root and not install_location: install_location = f"{install_root}/ep{version}"
         if install_location and not version:
             match = re.search(VERSION_PATTERN, install_location)
             if match: version = match.group(1)
@@ -159,7 +159,7 @@ class EPRestApi:
         
         messages = self.get_messages()
         if messages:
-            print(f"\n\Messages: \n\n")
+            print(f"\n\nMessages: \n\n")
             for msg in messages:
                 print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
 
@@ -545,7 +545,8 @@ class EPRestApi:
         ml_port = 29300 + (port % 100)
         if ml_port == port:
             ml_port -= 100
-        if not os.path.isfile(f"{install_location}/rcp/ep.exe"):
+        if not install_location.endswith('.exe'): install_location = f"{install_location}/rcp/ep.exe"
+        if not os.path.isfile(install_location):
             print(f'''\n\nBTC EmbeddedPlatform Executable (ep.exe) could not be found at the expected location ("{install_location}/rcp/ep.exe").
 - Please provide the correct version and installation root path:
 -> either using the version and install_root parameters of the EPRestApi constructor
@@ -556,7 +557,7 @@ class EPRestApi:
             print(f'''\n\nThe REST API AddOn is not installed for BTC EmbeddedPlatform {version}\n\n''')
             raise Exception("Addon not installed.")
         print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
-        args = f'"{install_location}/rcp/ep.exe"' + \
+        args = f'"{install_location}"' + \
             ' -clearPersistedState' + \
             ' -application' + ' ' + headless_application_id + \
             ' -nosplash' + \
