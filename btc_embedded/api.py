@@ -573,7 +573,7 @@ class EPRestApi:
         if license_location or self.config and 'licenseLocation' in self.config:
                 args += f" -Dep.licensing.location={(license_location or self.config['licenseLocation'])}"
         if additional_vmargs:
-            args += " ".join(additional_vmargs)
+            args += " " + " ".join(additional_vmargs)
         self.ep_process = subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
         self.actively_started = True
 
