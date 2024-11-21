@@ -563,6 +563,8 @@ def get_existing_references(execution_record_folder):
     return mil_executions, sil_executions
 
 def handle_error(ep, step_result, epp_file=None, error="", step_start_time=None):
+    if step_result and 'name' in step_result and error:
+        print(f"Encountered error in step '{step_result['stepName']}': {error}")
     step_result['status'] = 'ERROR'
     # only show first line of error, prevents ugly long stack traces
     shortened_error = str(error).split("\n")[0]
@@ -606,7 +608,7 @@ def get_epp_file_by_name(result_dir, model_path, suffix=''):
     return os.path.join(result_dir, epp_filename), epp_filename
 
 def get_wrapper_free_path(model_path):
-    dir, basename = os.path.splitext(model_path)
+    dir, basename = os.path.dirname(model_path), os.path.basename(model_path)
     if basename.startswith('Wrapper_'):
         name_without_wrapper = basename[len('Wrapper_'):]
         if os.path.exists(os.path.join(dir, name_without_wrapper)):
@@ -669,7 +671,7 @@ def unpack_model_properties(model_dict):
             - scope_name (str or None): Name of the scope, or None if not provided.
     """
     model_path = os.path.abspath(model_dict['model'])
-    model_name = os.path.basename(get_wrapper_free_path(model_path))
+    model_name = os.path.basename(get_wrapper_free_path(model_path))[:-4]
     script_path = os.path.abspath(model_dict['script']) if 'script' in model_dict and model_dict['script'] else None
     environment_xml_path = os.path.abspath(model_dict['environmentXml']) if 'environmentXml' in model_dict and model_dict['environmentXml'] else None
     scope_name = model_dict['scopeName'] if 'scopeName' in model_dict else None
@@ -678,14 +680,16 @@ def unpack_model_properties(model_dict):
 def get_project_result_item(model_name, epp_rel_path, start_time, b2b_coverage=None, sil_test=None, error_message=None, info=""):
     global report_json
     
-    # calculate duration in seconds
-    # if previous durations for this model are available, add those
-    duration_seconds = (datetime.now() - start_time).seconds
-    with open(report_json, 'r') as f:
-        report_data = json.load(f)
-        intermediate_results = report_data['results']
-        if model_name in intermediate_results and 'duration' in intermediate_results[model_name]:
-            duration_seconds += intermediate_results[model_name]['duration']
+    duration_seconds = ""
+    if report_json:
+        # calculate duration in seconds
+        # if previous durations for this model are available, add those
+        duration_seconds = (datetime.now() - start_time).seconds
+        with open(report_json, 'r') as f:
+            report_data = json.load(f)
+            intermediate_results = report_data['results']
+            if model_name in intermediate_results and 'duration' in intermediate_results[model_name]:
+                duration_seconds += intermediate_results[model_name]['duration']
 
     # return project result item
     result = {
@@ -707,8 +711,7 @@ def get_project_result_item(model_name, epp_rel_path, start_time, b2b_coverage=N
         result['testResult'] = 'ERROR'
         result['reportPath'] = f"{model_name}_messages.html"
         result['info'] = error_message
-    
-    update_report(project_item=result, additional_stats={'status': 'ERROR'})
+        update_report(project_item=result, additional_stats={'status': 'ERROR'})
 
     return result
 
@@ -760,7 +763,7 @@ def initialize_report(models, title, filename, additional_stats={}):
 
     # add all models as "scheduled"
     for model in models:
-        project_name = os.path.basename(get_wrapper_free_path(model['model']))
+        project_name = os.path.basename(get_wrapper_free_path(model['model']))[:-4]
         report_data['results'][project_name] = {
             "projectName" : project_name,
             "status" : "SCHEDULED"

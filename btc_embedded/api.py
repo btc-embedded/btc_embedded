@@ -205,10 +205,13 @@ class EPRestApi:
         
         - severity: INFO, WARNING, ERROR or CRITICAL
         - search_string: only prints messages that contain the given string"""
-        messages = self.get_messages(search_string, severity)
-        for msg in messages:
-            print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
-        print("\n")
+        try:
+            messages = self.get_messages(search_string, severity)
+            for msg in messages:
+                print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
+            print("\n")
+        except:
+            print("No messages available.")
     
     def get_messages(self, search_string=None, severity=None):
         """Returns all messages since the last profile create/profile load.
