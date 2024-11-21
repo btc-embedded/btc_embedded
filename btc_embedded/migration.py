@@ -16,14 +16,22 @@ report_json = None
 MIGRATION_PHASE_OLD = 'Old'
 MIGRATION_PHASE_NEW = 'New'
 
-def migration_suite_source(models, matlab_version, toolchain_script=None, test_mil=False, export_executions=False, reuse_code=False, ep=None):
+def migration_suite_source(models, matlab_version, toolchain_script=None, test_mil=False, export_executions=False, reuse_code=False, vector_gen_settings=None, ep=None):
     """For each of the given models this function generates tests for
     full coverage on the given model using the specified Matlab version,
-    then performs a MIL and SIL simulation to record the reference behavior."""
+    then performs a MIL and SIL simulation to record the reference behavior.
+    
+    models: list of dicts with keys 'model' (mandatory), 'script', 'scopeName', 'environmentXml' (optional)
+
+    In order to pass custom vector generation settings, provide a dictionary
+    with the structure accepted by the vector generation endpoint. You only need
+    to include the settings you want to change. You don't need to include the 
+    'scopeUid' key, as this will be added automatically.
+    """
     initialize_report(models=models,
                       title='BTC Migration Test Suite',
                       filename='BTCMigrationTestSuite.html',
-                      additional_stats={ 'toolchainScriptSrc' : os.path.abspath(toolchain_script) })
+                      additional_stats={ 'toolchainScriptSrc' : toolchain_script } if toolchain_script else {})
 
     # clear results folder
     ep = prepare_ep_and_matlab(MIGRATION_PHASE_OLD, matlab_version, toolchain_script, ep)
@@ -36,21 +44,25 @@ def migration_suite_source(models, matlab_version, toolchain_script=None, test_m
             model_results=model_results,
             test_mil=test_mil,
             export_executions=export_executions,
-            reuse_code=reuse_code)
+            reuse_code=reuse_code,
+            vector_gen_settings=vector_gen_settings)
 
     ep.close_application()
     return model_results
 
-def migration_suite_target(models, matlab_version, model_results=None, accept_interface_changes=False, test_mil=False, toolchain_script=None, reuse_code=False,ep=None):
+def migration_suite_target(models, matlab_version, model_results=None, accept_interface_changes=False, test_mil=False, toolchain_script=None, reuse_code=False, ep=None):
     """For each of the given models this function
     imports the reference execution records and simulates the same
     vectors on MIL and SIL based on the specified Matlab version. This
     regression test will show any changed behavior compared to the provided 
-    reference execution."""
+    reference execution.
+    
+    models: list of dicts with keys 'model' (mandatory), 'script', 'scopeName', 'environmentXml' (optional)
+    """
     global report_json; report_json = os.path.abspath(os.path.join('results', 'report.json'))
     
     if toolchain_script:
-        update_report(additional_stats={ 'toolchainScriptSrc' : os.path.abspath(toolchain_script) })
+        update_report(additional_stats={ 'toolchainScriptSrc' : toolchain_script } if toolchain_script else {})
 
     ep = prepare_ep_and_matlab(MIGRATION_PHASE_NEW, matlab_version, toolchain_script, ep)
 
@@ -67,19 +79,19 @@ def migration_suite_target(models, matlab_version, model_results=None, accept_in
     ep.close_application()
     return model_results
 
-def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=None, model_results=None, export_executions=False, reuse_code=False):
+def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=None, model_results=None, export_executions=False, reuse_code=False, vector_gen_settings=None):
     """Generates tests for full coverage on the given model using the
     specified Matlab version, then performs a MIL and SIL simulation
     to record the reference behavior.
+
+    old_model: dict with keys 'model' (mandatory), 'script', 'scopeName', 'environmentXml' (optional)
 
     Returns the BTC EmbeddedPlatform Project (*.epp).
     """
     global message_report_file
     step_results = []
     start_time = datetime.now()
-    model_path = os.path.abspath(old_model['model'])
-    model_name = os.path.basename(model_path)[:-4].replace('Wrapper_', '')
-    script_path = os.path.abspath(old_model['script']) if 'script' in old_model and old_model['script'] else None
+    model_path, model_name, script_path, environment_xml_path, scope_name = unpack_model_properties(old_model)
     result_dir = os.path.abspath('results')
     message_report_file = os.path.join(result_dir, f'{model_name}_messages.html')
     epp_file, epp_rel_path = get_epp_file_by_name(result_dir, model_path)
@@ -91,17 +103,17 @@ def migration_source(old_model, matlab_version, test_mil=False, ep_api_object=No
         return get_project_result_item(model_name=model_name, epp_rel_path=epp_rel_path, start_time=start_time, error_message=step_result['message'])
     
     # Empty BTC EmbeddedPlatform profile (*.epp) + Arch Import
-    toplevel_uid, step_result = src_02_import_model(ep, model_path, script_path, model_name, matlab_version, reuse_code, step_results)
+    scope_uid, step_result = src_02_import_model(ep, model_path, script_path, environment_xml_path, scope_name, model_name, matlab_version, reuse_code, step_results)
     if step_result and step_result['status'] == 'ERROR':
         return get_project_result_item(model_name=model_name, epp_rel_path=epp_rel_path, start_time=start_time, error_message=step_result['message'])
 
     # Generate vectors for full coverage
-    step_result = src_03_generate_vectors(ep, toplevel_uid, model_name, step_results)
+    step_result = src_03_generate_vectors(ep, scope_uid, model_name, vector_gen_settings, step_results)
     if step_result and step_result['status'] == 'ERROR':
         return get_project_result_item(model_name=model_name, epp_rel_path=epp_rel_path, start_time=start_time, error_message=step_result['message'])
 
     # Simulation
-    step_result = src_04_reference_simulation(ep, toplevel_uid, test_mil, export_executions, result_dir, model_name, step_results)
+    step_result = src_04_reference_simulation(ep, scope_uid, test_mil, export_executions, result_dir, model_name, step_results)
     if step_result and step_result['status'] == 'ERROR':
         return get_project_result_item(model_name=model_name, epp_rel_path=epp_rel_path, start_time=start_time, error_message=step_result['message'])
 
@@ -126,12 +138,13 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     regression test will show any changed behavior compared to the provided 
     reference execution.
 
+    new_model: dict with keys 'model' (mandatory), 'script', 'scopeName', 'environmentXml' (optional)
+
     Produces a test report
     """
     global message_report_file
     start_time = datetime.now()
-    model_path = os.path.abspath(new_model['model'])
-    model_name = os.path.basename(model_path)[:-4].replace('Wrapper_', '')
+    model_path, model_name, script_path, _, scope_name = unpack_model_properties(new_model)
     script_path = os.path.abspath(new_model['script']) if 'script' in new_model and new_model['script'] else None
     result_dir = os.path.abspath('results')
     message_report_file = quote(os.path.join(result_dir, f'{model_name}_messages.html'))
@@ -159,10 +172,10 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     
     if reference_executions_dir:
         # create profile and import reference execution records
-        toplevel_uid, step_result = tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, matlab_version, reference_executions_dir, test_mil, reuse_code, step_results)
+        scope_uid, step_result = tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, scope_name, model_name, matlab_version, reference_executions_dir, test_mil, reuse_code, step_results)
     else:
         # load BTC EmbeddedPlatform profile (*.epp), update architecture and check for interface changes
-        toplevel_uid, step_result = tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, model_name, accept_interface_changes, matlab_version, step_results)
+        scope_uid, step_result = tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, scope_name, model_name, accept_interface_changes, matlab_version, step_results)
         if step_result and step_result['status'] == 'ERROR':
             return get_project_result_item(model_name=model_name, epp_rel_path=epp_rel_path, start_time=start_time, error_message=step_result['message'])
 
@@ -183,7 +196,7 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
             return get_project_result_item(model_name=model_name, epp_rel_path=epp_rel_path, start_time=start_time, error_message=step_result['message'])
 
     # Create report
-    b2b_coverage, step_result = tgt_08_create_report(ep, toplevel_uid, test_mil, result_dir, model_name, step_results)
+    b2b_coverage, step_result = tgt_08_create_report(ep, scope_uid, test_mil, result_dir, model_name, step_results)
     if step_result and step_result['status'] == 'ERROR':
         return get_project_result_item(model_name=model_name, epp_rel_path=epp_rel_path, start_time=start_time, error_message=step_result['message'])
 
@@ -233,11 +246,11 @@ def src_01_start_ep(ep_api_object, matlab_version, model_name, results):
     results.append(step_result)
     return ep, step_result
 
-def src_02_import_model(ep, model_path, script_path, model_name, matlab_version, reuse_code, results):
+def src_02_import_model(ep, model_path, script_path, environment_xml_path, scope_name, model_name, matlab_version, reuse_code, results):
     start_time = time.time()
     try:
         step_result = { 'stepName' : 'Import Model' }
-        toplevel_uid = None
+        scope_uid = None
         update_report_running(model_name, step_result)
         clear_sl_cachefiles(os.path.dirname(model_path))
         ep.post('profiles?discardCurrentProfile=true')
@@ -257,42 +270,49 @@ def src_02_import_model(ep, model_path, script_path, model_name, matlab_version,
             payload = {
                 'tlModelFile' : model_path,
                 'tlInitScript' : script_path
-            } 
-            legacy_code_xml = os.path.join(os.path.dirname(model_path), 'LegacyCode.xml')
-            if os.path.isfile(legacy_code_xml):
-                payload['environment'] = legacy_code_xml
+            }
+            # use environment xml if available, otherwise assume default name 'Environment.xml' next to the model
+            if environment_xml_path:
+                payload['environment'] = environment_xml_path
+            else:
+                legacy_code_xml = os.path.join(os.path.dirname(model_path), 'Environment.xml')
+                if os.path.isfile(legacy_code_xml):
+                    payload['environment'] = legacy_code_xml
             if reuse_code:
                 payload['useExistingCode'] = True
             ep.post('architectures/targetlink', payload, message=message)
         else:
             raise Exception('Unsupported code generation config.')
 
-        toplevel_uid = ep.get('scopes')[0]['uid']
+        scope_uid = get_scope_uid(ep, scope_name)
         step_result['status'] = 'PASSED'
     except Exception as e:
         handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
-    return toplevel_uid, step_result
+    return scope_uid, step_result
 
-def src_03_generate_vectors(ep, toplevel_uid, model_name, results):
+def src_03_generate_vectors(ep, scope_uid, model_name, vector_gen_settings, results):
     start_time = time.time()
     try:
         step_result = { 'stepName' : 'Generate Vectors' }
         update_report_running(model_name, step_result)
-        vector_gen_settings = {
-            'scopeUid' : toplevel_uid,
-            'pllString': 'STM',
-            'engineSettings' : {
-                'timeoutSeconds': 300,
-                'engineAtg' : { 'timeoutSecondsPerSubsystem' : 100 },
-                'engineCv' : {
-                    'coreEngines' : [ { 'name' : 'ISAT' }, { 'name' : 'CBMC' }] ,
-                    'maximumNumberOfThreads' : 2
+        if vector_gen_settings:
+            vector_gen_settings['scopeUid'] = scope_uid
+        else:
+            vector_gen_settings = {
+                'scopeUid' : scope_uid,
+                'pllString': 'STM',
+                'engineSettings' : {
+                    'timeoutSeconds': 300,
+                    'engineAtg' : { 'timeoutSecondsPerSubsystem' : 100 },
+                    'engineCv' : {
+                        'coreEngines' : [ { 'name' : 'ISAT' }, { 'name' : 'CBMC' }] ,
+                        'maximumNumberOfThreads' : 2
+                    }
                 }
             }
-        }
         ep.post('coverage-generation', vector_gen_settings, message="Generating vectors")
-        b2b_coverage = ep.get(f"scopes/{toplevel_uid}/coverage-results-b2b")
+        b2b_coverage = ep.get(f"scopes/{scope_uid}/coverage-results-b2b")
         print('Coverage ' + "{:.2f}%".format(b2b_coverage['MCDCPropertyCoverage']['handledPercentage']))
         step_result['status'] = 'PASSED'
     except Exception as e:
@@ -300,7 +320,7 @@ def src_03_generate_vectors(ep, toplevel_uid, model_name, results):
     results.append(step_result)
     return step_result
 
-def src_04_reference_simulation(ep, toplevel_uid, test_mil, export_executions, result_dir, model_name, results):
+def src_04_reference_simulation(ep, scope_uid, test_mil, export_executions, result_dir, model_name, results):
     start_time = time.time()
     try:
         step_result = { 'stepName' : 'Reference Simulation' }
@@ -308,7 +328,7 @@ def src_04_reference_simulation(ep, toplevel_uid, test_mil, export_executions, r
 
         mil_sil_configs = ep.get('execution-configs')['execConfigNames']
         payload = { 'execConfigNames' : mil_sil_configs if test_mil else ['SIL'] }
-        ep.post(f"scopes/{toplevel_uid}/testcase-simulation", payload, message=f"Reference Simulation on {payload['execConfigNames']}")
+        ep.post(f"scopes/{scope_uid}/testcase-simulation", payload, message=f"Reference Simulation on {payload['execConfigNames']}")
 
         # Store MIL and SIL executions for comparison
         all_execution_records = ep.get('execution-records')
@@ -345,7 +365,7 @@ def src_04_reference_simulation(ep, toplevel_uid, test_mil, export_executions, r
     results.append(step_result)
     return step_result
 
-def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, model_name, accept_interface_changes, matlab_version, results):
+def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, scope_name, model_name, accept_interface_changes, matlab_version, results):
     start_time = time.time()
     try:
         step_result = { 'stepName' : 'Update & Check Interface' }
@@ -356,8 +376,8 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, mod
         ep.get(f'profiles/{epp_file}?discardCurrentProfile=true')
 
         # check for interface changes (part 1)
-        toplevel_uid = ep.get('scopes')[0]['uid']
-        toplevel_signals_old = [signal['identifier'] for signal in ep.get(f'scopes/{toplevel_uid}/signals')]
+        scope_uid = get_scope_uid(ep, scope_name)
+        toplevel_signals_old = [signal['identifier'] for signal in ep.get(f'scopes/{scope_uid}/signals')]
 
         # Arch Update
         message=f"Updating model & generating code for {model_name} with Matlab {matlab_version}"
@@ -379,8 +399,8 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, mod
         ep.put('architectures', message=message)
         
         # check for interface changes (part 2)
-        toplevel_uid = ep.get('scopes')[0]['uid'] # fetch again: scopes have new uids after update
-        toplevel_signals_new = [signal['identifier'] for signal in ep.get(f'scopes/{toplevel_uid}/signals')]
+        scope_uid = get_scope_uid(ep, scope_name) # fetch again: scopes have new uids after update
+        toplevel_signals_new = [signal['identifier'] for signal in ep.get(f'scopes/{scope_uid}/signals')]
         if not (toplevel_signals_old == toplevel_signals_new):
             severity = 'CRITICAL' if accept_interface_changes else 'ERROR'
             msg = f'The interface of {model_name} has changed:'
@@ -395,9 +415,9 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, mod
     except Exception as e:
         handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
-    return toplevel_uid, step_result
+    return scope_uid, step_result
 
-def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, matlab_version, reference_executions_dir, test_mil, reuse_code, results):
+def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, scope_name, model_name, matlab_version, reference_executions_dir, test_mil, reuse_code, results):
     start_time = time.time()
     try:
         step_result = { 'stepName' : 'Target Profile & Ref Executions Import' }
@@ -448,12 +468,12 @@ def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, model_name, 
         # saving target profile
         ep.put('profiles', { 'path': epp_file })
 
-        toplevel_uid = ep.get('scopes')[0]['uid']
+        scope_uid = get_scope_uid(ep, scope_name)
         step_result['status'] = 'PASSED'
     except Exception as e:
         handle_error(ep, step_result, error=e, step_start_time=start_time)
     results.append(step_result)
-    return toplevel_uid, step_result
+    return scope_uid, step_result
 
 def tgt_06_tolerances(ep, model_name, results):
     start_time = time.time()
@@ -514,7 +534,7 @@ def tgt_07_regression_test_mil(ep, model_name, results):
     results.append(step_result)
     return mil_test, step_result
 
-def tgt_08_create_report(ep, toplevel_uid, test_mil, result_dir, model_name, results):
+def tgt_08_create_report(ep, scope_uid, test_mil, result_dir, model_name, results):
     start_time = time.time()
     try:
         # Create project report using "regression-test" template
@@ -522,14 +542,14 @@ def tgt_08_create_report(ep, toplevel_uid, test_mil, result_dir, model_name, res
         step_result = { 'stepName' : 'Create Report' }
         update_report_running(model_name, step_result)
 
-        # try: ep.post('coverage-generation', { 'scopeUid' : toplevel_uid, 'pllString': 'MCDC' })
+        # try: ep.post('coverage-generation', { 'scopeUid' : scope_uid, 'pllString': 'MCDC' })
         # except: pass
-        b2b_coverage = ep.get(f"scopes/{toplevel_uid}/coverage-results-b2b")
+        b2b_coverage = ep.get(f"scopes/{scope_uid}/coverage-results-b2b")
         # select the appropriate report template
         report_template = select_report_template(ep, test_mil)
         query_param = f'?template-name={report_template}' if report_template else ''
         # create report
-        report = ep.post(f"scopes/{toplevel_uid}/project-report{query_param}", message="Creating test report")
+        report = ep.post(f"scopes/{scope_uid}/project-report{query_param}", message="Creating test report")
         ep.post(f"reports/{report['uid']}", { 'exportPath': result_dir, 'newName': f'{model_name}-migration-test' })
         step_result['status'] = 'PASSED'
     except Exception as e:
@@ -582,8 +602,16 @@ def prepare_ep_and_matlab(migration_phase, matlab_version, toolchain_script=None
     return ep
 
 def get_epp_file_by_name(result_dir, model_path, suffix=''):
-    model_name = os.path.basename(model_path)[:-4].replace('Wrapper_', '') + suffix
-    return os.path.join(result_dir, model_name + '.epp'), model_name + '.epp'
+    epp_filename = os.path.basename(get_wrapper_free_path(model_path))[:-4] + suffix + '.epp'
+    return os.path.join(result_dir, epp_filename), epp_filename
+
+def get_wrapper_free_path(model_path):
+    dir, basename = os.path.splitext(model_path)
+    if basename.startswith('Wrapper_'):
+        name_without_wrapper = basename[len('Wrapper_'):]
+        if os.path.exists(os.path.join(dir, name_without_wrapper)):
+            basename = name_without_wrapper
+    return os.path.join(dir, basename)
 
 def select_report_template(ep, test_mil):
     # pick the right report template
@@ -603,6 +631,49 @@ def clear_sl_cachefiles(dir=os.getcwd()):
         [shutil.rmtree(os.path.join(dir, rtw_dir)) for rtw_dir in glob.glob('*_rtw', root_dir=dir)]
     except Exception as e:
         raise Exception(f"Error removing model cache files in '{dir}'. " + repr(e))
+
+def get_scope_uid(ep, scope_name):
+    """
+    Retrieve the UID of a specific scope from the endpoint.
+    Args:
+        ep: EPRestApi object
+        scope_name (str): The name of the scope to retrieve the UID for. If None, the UID of the first scope is returned.
+    Returns:
+        str: The UID of the specified scope.
+    Raises:
+        Exception: If the specified scope name is not found in the endpoint's scopes.
+    """
+    scopes = ep.get('scopes')
+    if scope_name:
+        scope = next((scope for scope in scopes if scope['name'] == scope_name), None)
+        if not scope: raise Exception(f"Scope '{scope_name}' not found.")
+    else:
+        scope = scopes[0]
+    return scope['uid']
+
+def unpack_model_properties(model_dict):
+    """
+    Extracts and returns various properties from a model dictionary.
+    Args:
+        model_dict (dict): A dictionary containing model properties. Expected keys are:
+            - 'model': Path to the model file.
+            - 'script' (optional): Path to the script file.
+            - 'environmentXml' (optional): Path to the environment XML file.
+            - 'scopeName' (optional): Name of the scope.
+    Returns:
+        tuple: A tuple containing:
+            - model_path (str): Absolute path to the model file.
+            - model_name (str): Base name of the model file.
+            - script_path (str or None): Absolute path to the script file, or None if not provided.
+            - environment_xml_path (str or None): Absolute path to the environment XML file, or None if not provided.
+            - scope_name (str or None): Name of the scope, or None if not provided.
+    """
+    model_path = os.path.abspath(model_dict['model'])
+    model_name = os.path.basename(get_wrapper_free_path(model_path))
+    script_path = os.path.abspath(model_dict['script']) if 'script' in model_dict and model_dict['script'] else None
+    environment_xml_path = os.path.abspath(model_dict['environmentXml']) if 'environmentXml' in model_dict and model_dict['environmentXml'] else None
+    scope_name = model_dict['scopeName'] if 'scopeName' in model_dict else None
+    return model_path, model_name, script_path, environment_xml_path, scope_name
 
 def get_project_result_item(model_name, epp_rel_path, start_time, b2b_coverage=None, sil_test=None, error_message=None, info=""):
     global report_json
@@ -643,38 +714,39 @@ def get_project_result_item(model_name, epp_rel_path, start_time, b2b_coverage=N
 
 def update_report(project_item=None, additional_stats={}):
     global report_json
-    # load existing state
-    with open(report_json, "r") as f:
-        report_data = json.load(f)
+    if report_json:
+        # load existing state
+        with open(report_json, "r") as f:
+            report_data = json.load(f)
 
-    # add information
-    if project_item:
-        if project_item['projectName'] in report_data['results']:
-            # update existing item
-            old_project_item = report_data['results'][project_item['projectName']]
-            old_project_item.update(project_item)
-        else:
-            # add new item
-            report_data['results'][project_item['projectName']] = project_item
+        # add information
+        if project_item:
+            if project_item['projectName'] in report_data['results']:
+                # update existing item
+                old_project_item = report_data['results'][project_item['projectName']]
+                old_project_item.update(project_item)
+            else:
+                # add new item
+                report_data['results'][project_item['projectName']] = project_item
 
-    if additional_stats:
-        if 'additionalStats' in report_data:
-            # clear status & globalMessage
-            if 'status' not in additional_stats and 'status' in report_data['additionalStats']:
-                del report_data['additionalStats']['status']
-            if 'globalMessage' not in additional_stats and 'globalMessage' in report_data['additionalStats']:
-                del report_data['additionalStats']['globalMessage']
-            # update existing additional_stats section
-            report_data['additionalStats'].update(additional_stats)
-        else:
-            # add new additional_stats section
-            report_data['additionalStats'] = additional_stats
+        if additional_stats:
+            if 'additionalStats' in report_data:
+                # clear status & globalMessage
+                if 'status' not in additional_stats and 'status' in report_data['additionalStats']:
+                    del report_data['additionalStats']['status']
+                if 'globalMessage' not in additional_stats and 'globalMessage' in report_data['additionalStats']:
+                    del report_data['additionalStats']['globalMessage']
+                # update existing additional_stats section
+                report_data['additionalStats'].update(additional_stats)
+            else:
+                # add new additional_stats section
+                report_data['additionalStats'] = additional_stats
 
-    # dump updated state
-    with open(report_json, "w") as f:
-        json.dump(report_data, f, indent=4)
+        # dump updated state
+        with open(report_json, "w") as f:
+            json.dump(report_data, f, indent=4)
 
-    create_report_from_json(json_path=report_json)
+        create_report_from_json(json_path=report_json)
 
 def initialize_report(models, title, filename, additional_stats={}):
     global report_json; report_json = os.path.abspath(os.path.join('results', 'report.json'))
@@ -688,7 +760,7 @@ def initialize_report(models, title, filename, additional_stats={}):
 
     # add all models as "scheduled"
     for model in models:
-        project_name = os.path.basename(model['model'])[:-4].replace('Wrapper_', '')
+        project_name = os.path.basename(get_wrapper_free_path(model['model']))
         report_data['results'][project_name] = {
             "projectName" : project_name,
             "status" : "SCHEDULED"
