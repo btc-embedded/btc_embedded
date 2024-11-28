@@ -2,12 +2,11 @@ import os
 import re
 import shutil
 from decimal import Decimal
-from importlib import resources
 
 import yaml
 
 from btc_embedded.config import (BTC_CONFIG_DEFAULTLOCATION,
-                                 BTC_CONFIG_ENVVAR_NAME)
+                                 BTC_CONFIG_ENVVAR_NAME, get_resource_path)
 
 VERSION_PATTERN_2 = r'(\d+\.\d+[a-zA-Z]\d+)' # e.g.   "24.3p1"
 KNOWN_FLOAT_TYPES = [ 'double', 'single', 'float', 'float32', 'float64', 'real' ]
@@ -53,7 +52,7 @@ def install_btc_config():
                         # higher values will overwrite this
 
         if ep_version and install_location:
-            config_file_template = os.path.join(resources.files('btc_embedded'), 'resources', 'btc_config_windows.yml')
+            config_file_template = get_resource_path('btc_config_windows.yml')
             with open(config_file_template, 'r') as f:
                 config = yaml.safe_load(f) or {}
                 config['installationRoot'] = install_location.replace(f'ep{ep_version}', '')[:-1]
@@ -79,7 +78,7 @@ def install_report_templates(template_folder):
     try:
         def xml_filter(_, names): return [name for name in names if not name.endswith('.xml')]
         os.makedirs(template_folder, exist_ok=True)
-        resources_folder = os.path.join(resources.files('btc_embedded'), 'resources', 'projectreport_templates')
+        resources_folder = get_resource_path('projectreport_templates')
         shutil.copytree(resources_folder, template_folder, ignore=xml_filter, dirs_exist_ok=True)
         print(f"Installed project report templates to '{template_folder}'")
     except:

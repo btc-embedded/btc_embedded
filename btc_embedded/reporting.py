@@ -3,7 +3,8 @@ import getpass
 import json
 import os
 import re
-from importlib import resources
+
+from config import get_resource_path
 
 
 def create_report_from_json(json_path):
@@ -54,7 +55,7 @@ def create_test_report_summary(results={}, report_title='BTC Test Report Summary
         projects_string += get_project_string(result, target_dir) + '\r\n'
 
     # import html template
-    with open(os.path.join(resources.files('btc_embedded'), 'resources', 'btc_summary_report.template'), 'r') as template_file:
+    with open(get_resource_path('btc_summary_report.template'), 'r') as template_file:
         html_template = template_file.read()
 
     # fill placeholders in template

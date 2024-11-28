@@ -105,3 +105,12 @@ def __load_config(config_file):
     except:
         pass
     return config
+
+def get_resource_path(filename):
+    try:
+        # main approach
+        return str(os.path.join(resources.files('btc_embedded'), 'resources', filename))
+    except:
+        # fallback for Python 3.8 and older
+        with resources.path('btc_embedded', 'resources') as resource_dir:
+            return os.path.join(resource_dir, filename)
