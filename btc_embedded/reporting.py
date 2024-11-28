@@ -4,7 +4,7 @@ import json
 import os
 import re
 
-from config import get_resource_path
+from btc_embedded.config import get_resource_path
 
 
 def create_report_from_json(json_path):
