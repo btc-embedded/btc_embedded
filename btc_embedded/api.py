@@ -37,7 +37,6 @@ class EPRestApi:
         install_location=None,
         lic='',
         config=None,
-        message_marker_date=int(time.time() * 1000),
         license_location=None,
         additional_vmargs=[],
         timeout=120,
@@ -67,6 +66,7 @@ class EPRestApi:
         self.ep_process = None
         self.config = None
         self.start_time = time.time()
+        self.message_marker_date=int(time.time() * 1000)
 
         #
         # Prepare configuration
