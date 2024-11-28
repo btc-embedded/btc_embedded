@@ -629,8 +629,8 @@ def clear_sl_cachefiles(dir=os.getcwd()):
         shutil.rmtree(os.path.join(dir, 'slprj'), ignore_errors=True)
         shutil.rmtree(os.path.join(dir, 'TLProj'), ignore_errors=True)
         shutil.rmtree(os.path.join(dir, 'TLSim'), ignore_errors=True)
-        [os.remove(os.path.join(dir, file)) for file in glob.glob('*.slxc', root_dir=dir)]
-        [shutil.rmtree(os.path.join(dir, rtw_dir)) for rtw_dir in glob.glob('*_rtw', root_dir=dir)]
+        [os.remove(os.path.join(dir, file)) for file in glob.glob(f"{dir}/*.slxc")]
+        [shutil.rmtree(os.path.join(dir, rtw_dir)) for rtw_dir in glob.glob(f"{dir}/*_rtw")]
     except Exception as e:
         raise Exception(f"Error removing model cache files in '{dir}'. " + repr(e))
 

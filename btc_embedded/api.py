@@ -37,6 +37,7 @@ class EPRestApi:
         install_location=None,
         lic='',
         config=None,
+        message_marker_date=int(time.time() * 1000),
         license_location=None,
         additional_vmargs=[],
         timeout=120,
