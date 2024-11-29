@@ -574,7 +574,10 @@ def handle_error(ep, step_result, epp_file=None, error="", step_start_time=None)
     # export messages to {model_name}_messages.html
     global message_report_file
     os.makedirs(os.path.dirname(message_report_file), exist_ok=True)
-    ep.post(f'messages/message-report?file-name={quote(message_report_file, safe="")}&marker-date={ep.message_marker_date}')
+    message_report_uri = f'messages/message-report?file-name={quote(message_report_file, safe="")}'
+    if ep.message_marker_date:
+        message_report_uri += f'&marker-date={ep.message_marker_date}'
+    ep.post(message_report_uri)
     errors_from_log = ep.get_errors_from_log(step_start_time)
     with open(f"{message_report_file[:-13]}error.log", 'w') as log:
         log.writelines(errors_from_log)
