@@ -34,6 +34,7 @@ def get_project_specific_config(project_directory=os.getcwd(), project_config=No
     called 'btc_project_config.yml' that is found when recursively searching
     the specified project directory. If no project directory is specified,
     the current working directory is used."""
+    if isinstance(project_config, dict): return project_config, None
     project_specific_config = {}
     path = None
     if project_config: return __load_config(project_config), project_config
@@ -61,11 +62,18 @@ def get_merged_config(project_directory=os.getcwd(), silent=False, project_confi
 
     # get the project specific config
     project_specific_config, path = get_project_specific_config(project_directory, project_config)
-    if project_specific_config and not silent:
+    if project_specific_config and not silent and path:
         print(f"Applying project-specific config from {path}")
-
+    elif project_specific_config and not silent:
+        print(f"Applying project-specific config")
     # merge them and return the merged config
-    config.update(project_specific_config)
+    def recursive_update(d, u):
+        for k, v in u.items():
+            if isinstance(v, dict) and k in d:
+                recursive_update(d[k], v)
+            else:
+                d[k] = v
+    recursive_update(config, project_specific_config)
     return config
 
 def get_vector_gen_config(scope_uid, config=None):

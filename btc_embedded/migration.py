@@ -147,7 +147,7 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     model_path, model_name, script_path, _, scope_name = unpack_model_properties(new_model)
     script_path = os.path.abspath(new_model['script']) if 'script' in new_model and new_model['script'] else None
     result_dir = os.path.abspath('results')
-    message_report_file = quote(os.path.join(result_dir, f'{model_name}_messages.html'))
+    message_report_file = os.path.join(result_dir, f'{model_name}_messages.html')
     step_results = model_results[model_name] if (model_results and model_name in model_results) else []
     if step_results and 'erDir' in step_results[-1]:
         reference_executions_dir = step_results[-1]['erDir']
