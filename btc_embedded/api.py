@@ -98,7 +98,7 @@ class EPRestApi:
         else:
             # start the application
             if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, additional_vmargs)
-            elif platform.system() == 'Linux': self._start_app_linux(skip_matlab_start, additional_vmargs)
+            elif platform.system() == 'Linux': self._start_app_linux(license_location, lic, skip_matlab_start, additional_vmargs)
             
             print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
             self._connect_within_timeout(timeout)
@@ -384,7 +384,8 @@ class EPRestApi:
             appdata_location = os.environ['APPDATA'].replace('\\', '/') + f"/BTC/ep/{version}/"
             self.log_file_path = os.path.join(appdata_location, self._PORT_, 'logs', 'current.log')
         elif platform.system() == 'Linux':
-            self.log_file_path = os.path.join(os.environ['LOG_DIR'], 'current.log')
+            log_dir = os.environ['LOG_DIR'] if 'LOG_DIR' in os.environ else '/tmp/ep/logs'
+            self.log_file_path = os.path.join(log_dir, 'current.log')
 
     def _apply_preferences(self):
         """Applies the preferences defined in the config object"""
@@ -498,7 +499,25 @@ class EPRestApi:
 
     # start commands depending on OS
 
-    def _start_app_linux(self, skip_matlab_start, additional_vmargs):
+    def _prepare_env(self):
+        props_with_default_values = {
+            'EP_INSTALL_PATH' : '/opt/ep',
+            'EP_REGISTRY' : '/opt/Configuration/eplinuxregistry',
+            'EP_LOG_CONFIG' : '/opt/ep/configuration/logback_linux.xml',
+            'LOG_DIR' : '/tmp/ep/logs',
+            'WORK_DIR' : '/tmp/ep/workdir',
+            'TMP_DIR' : '/tmp/ep/tmp',
+            'LICENSE_LOCATION' : '27000@srvbtces01.btc-es.local',
+            'LICENSE_PACKAGES' : 'ET_COMPLETE',
+            'REST_PORT' : '8080'
+        }
+        for prop in props_with_default_values.keys():
+            if not prop in os.environ:
+                os.environ[prop] = props_with_default_values[prop]
+        
+
+    def _start_app_linux(self, license_location, lic, skip_matlab_start, additional_vmargs):
+        self._prepare_env()
         # container use case -> start EP and Matlab
         try:
             ep_ini_path = os.path.join(os.environ['EP_INSTALL_PATH'], 'ep.ini')
@@ -520,15 +539,17 @@ class EPRestApi:
             '-Dep.configuration.logpath=' + os.environ['LOG_DIR'],
             '-Dep.runtime.workdir=' + os.environ['WORK_DIR'],
             '-Dbtc.root.temp.dir=' + os.environ['TMP_DIR'],
-            '-Dep.licensing.location=' + os.environ['LICENSE_LOCATION'],
-            '-Dep.licensing.package=' + os.environ['LICENSE_PACKAGES'],
+            '-Dep.licensing.location=' + (license_location or os.environ['LICENSE_LOCATION']),
+            '-Dep.licensing.package=' + (lic or os.environ['LICENSE_PACKAGES']),
             '-Dep.rest.port=' + os.environ['REST_PORT'],
             '-Dosgi.configuration.area.default=/tmp/ep/configuration',
             '-Dosgi.instance.area.default=/tmp/ep/workspace',
             '-Dep.runtime.batch=ep',
             '-Dep.runtime.api.port=1109',
             '-Dep.matlab.ip.range=' + matlab_ip ]
-        if additional_vmargs: args.extend(additional_vmargs)
+        if additional_vmargs:
+            print(f"Applying additional vmargs: {additional_vmargs}")
+            args.extend(additional_vmargs)
         
         # start ep process
         self.ep_process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
