@@ -98,12 +98,12 @@ class EPRestApi:
         else:
             # start the application
             if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, additional_vmargs)
-            elif platform.system() == 'Linux': self._start_app_linux(license_location, lic, skip_matlab_start, additional_vmargs)
+            elif platform.system() == 'Linux': version = self._start_app_linux(license_location, lic, skip_matlab_start, additional_vmargs)
             
             print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
             self._connect_within_timeout(timeout)
             print('\nBTC EmbeddedPlatform has started.')
-        self._apply_preferences()
+        self._apply_preferences(version)
         
 
     # - - - - - - - - - - - - - - - - - - - - 
@@ -387,9 +387,10 @@ class EPRestApi:
             log_dir = os.environ['LOG_DIR'] if 'LOG_DIR' in os.environ else '/tmp/ep/logs'
             self.log_file_path = os.path.join(log_dir, 'current.log')
 
-    def _apply_preferences(self):
+    def _apply_preferences(self, version):
         """Applies the preferences defined in the config object"""
         config = self.config
+        user_defined_datetime_format = False
         if config and 'preferences' in config:
             preferences = []
             for pref_key in list(config['preferences'].keys()):
@@ -411,10 +412,18 @@ class EPRestApi:
                 elif pref_key == 'ARCHITECTURE_EC_CUSTOM_USER_CONFIGURATION_FOLDER':
                     ec_cfg_folder  = self._rel_to_abs(config['preferences'][pref_key])
                     preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': ec_cfg_folder })
+                elif pref_key == 'GENERAL_DATE_FORMAT_PATTERN' or pref_key == 'GENERAL_TIME_FORMAT_PATTERN' and version >= '24.3p0':
+                    user_defined_datetime_format = True
+                    preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': config['preferences'][pref_key] })
                 # all other cases
                 else:
                     preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': config['preferences'][pref_key] })
-            
+
+            # set useful datetime format if not user-defined
+            if version >= '24.3p0' and not user_defined_datetime_format:
+                preferences.append( { 'preferenceName' : 'GENERAL_DATE_FORMAT_PATTERN', 'preferenceValue': 'YYYY-MM-dd' })
+                preferences.append( { 'preferenceName' : 'GENERAL_TIME_FORMAT_PATTERN', 'preferenceValue': 'HH:mm:ss' })
+
             # apply preferences
             try:
                 self.put('preferences', preferences)
@@ -560,6 +569,8 @@ class EPRestApi:
             import pty
             _, secondary_pty = pty.openpty()
             subprocess.Popen('matlab', stdin=secondary_pty)
+
+        return version
 
     def _start_app_windows(self, version, install_location, port, license_location, lic, additional_vmargs):
         headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'

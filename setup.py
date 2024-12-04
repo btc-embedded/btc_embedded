@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='btc_embedded',
-    version='24.2.31',
+    version='24.3.1',
     packages=['btc_embedded'],
     include_package_data=True,
     license='MIT',

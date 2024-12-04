@@ -149,10 +149,7 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
     result_dir = os.path.abspath('results')
     message_report_file = os.path.join(result_dir, f'{model_name}_messages.html')
     step_results = model_results[model_name] if (model_results and model_name in model_results) else []
-    if step_results and 'erDir' in step_results[-1]:
-        reference_executions_dir = step_results[-1]['erDir']
-    else:
-        reference_executions_dir = None
+    reference_executions_dir = step_results[-1]['erDir'] if step_results and 'erDir' in step_results[-1] else None
     if epp_file:
         epp_rel_path = None
         if os.path.realpath(result_dir) in os.path.realpath(epp_file):
@@ -162,8 +159,10 @@ def migration_target(new_model, matlab_version, test_mil=False, ep_api_object=No
         epp_name_suffix = ('_target' if reference_executions_dir else '')
         epp_file, epp_rel_path = get_epp_file_by_name(result_dir, model_path, suffix=epp_name_suffix)
     
-    # skip component if epp doesn't exist (e.g. due to error in source part)
-    if not os.path.isfile(epp_file): return None
+    # skip component if neither epp nor execution records directory exist (e.g. due to error in source part)
+    epp_file_exists = os.path.isfile(epp_file)
+    reference_executions_dir_exists = os.path.isdir(reference_executions_dir) if reference_executions_dir else False
+    if not (epp_file_exists or reference_executions_dir_exists): return None
     
     # start ep or use provided api object
     ep, step_result = src_01_start_ep(ep_api_object, matlab_version, model_name, step_results)
@@ -358,7 +357,7 @@ def src_04_reference_simulation(ep, scope_uid, test_mil, export_executions, resu
                 ep.post('execution-records-export', { 'UIDs' : mil_execution_records_uids, 'exportDirectory': mil_er_dir })
 
         if export_executions:
-            step_result['erDir'] = os.path.join(result_dir, 'ER')
+            step_result['erDir'] = os.path.join(result_dir, model_name, 'ER')
         step_result['status'] = 'PASSED'
     except Exception as e:
         handle_error(ep, step_result, error=e, step_start_time=start_time)
