@@ -94,7 +94,8 @@ class EPRestApi:
         #
         if self._is_rest_service_available():
             # connect to a running application
-            print(f'Connected to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
+            version = self.get('openapi.json')['info']['version']
+            print(f'Connected to BTC EmbeddedPlatform {version} at {host}:{self._PORT_}')
         else:
             # start the application
             if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, additional_vmargs)
