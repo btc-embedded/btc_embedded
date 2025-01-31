@@ -1,5 +1,6 @@
 import glob
 import json
+import logging
 import os
 import shutil
 import time
@@ -10,6 +11,8 @@ import btc_embedded.util as util
 from btc_embedded.api import EPRestApi
 from btc_embedded.helpers import apply_tolerances_from_config
 from btc_embedded.reporting import create_report_from_json
+
+logger = logging.getLogger('BTC')
 
 message_report_file = None
 report_json = None
@@ -312,7 +315,7 @@ def src_03_generate_vectors(ep, scope_uid, model_name, vector_gen_settings, resu
             }
         ep.post('coverage-generation', vector_gen_settings, message="Generating vectors")
         b2b_coverage = ep.get(f"scopes/{scope_uid}/coverage-results-b2b")
-        print('Coverage ' + "{:.2f}%".format(b2b_coverage['MCDCPropertyCoverage']['handledPercentage']))
+        logger.info('Coverage ' + "{:.2f}%".format(b2b_coverage['MCDCPropertyCoverage']['handledPercentage']))
         step_result['status'] = 'PASSED'
     except Exception as e:
         handle_error(ep, step_result, error=e, step_start_time=start_time)
@@ -408,7 +411,7 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, sco
     - new interface: {toplevel_signals_new}"""
             ep.post('messages', { "message": msg, "hint": hint, "severity": severity })
             warning = f"[WARNING] {msg}\n{hint}"
-            print(warning)
+            logger.warning(warning)
             if not accept_interface_changes: raise Exception(warning)
         step_result['status'] = 'PASSED'
     except Exception as e:
@@ -502,7 +505,7 @@ def tgt_06_regression_test_sil(ep, model_name, results):
         }
         sil_test = ep.post(f"folders/{old_sil_folder['uid']}/regression-tests", payload, message="Regression Test SIL vs. SIL")
         # verdictStatus, failed, error, passed, total
-        print(f"Result: {sil_test['verdictStatus']}")
+        logger.info(f"Result: {sil_test['verdictStatus']}")
         step_result['status'] = sil_test['verdictStatus']
     except Exception as e:
         handle_error(ep, step_result, error=e, step_start_time=start_time)
@@ -526,7 +529,7 @@ def tgt_07_regression_test_mil(ep, model_name, results):
         }
         mil_test = ep.post(f"folders/{old_mil_folder['uid']}/regression-tests", payload, message="Regression Test MIL vs. MIL")
         # verdictStatus, failed, error, passed, total
-        print(f"Result: {mil_test['verdictStatus']}")
+        logger.info(f"Result: {mil_test['verdictStatus']}")
         step_result['status'] = mil_test['verdictStatus']
     except Exception as e:
         handle_error(ep, step_result, error=e, step_start_time=start_time)
@@ -563,7 +566,7 @@ def get_existing_references(execution_record_folder):
 
 def handle_error(ep, step_result, epp_file=None, error="", step_start_time=None):
     if step_result and 'name' in step_result and error:
-        print(f"Encountered error in step '{step_result['stepName']}': {error}")
+        logger.error(f"Encountered error in step '{step_result['stepName']}': {error}")
     step_result['status'] = 'ERROR'
     # only show first line of error, prevents ugly long stack traces
     shortened_error = str(error).split("\n")[0]

@@ -1,3 +1,5 @@
+# Configure logger
+import logging
 import os
 import platform
 import re
@@ -14,6 +16,8 @@ from btc_embedded.config import (BTC_CONFIG_ENVVAR_NAME,
                                  get_config_path_from_resources,
                                  get_global_config)
 from btc_embedded.helpers import install_btc_config, install_report_templates
+
+logger = logging.getLogger('BTC')
 
 VERSION_PATTERN = r'ep(\d+\.\d+[a-zA-Z]\d+)' # e.g. "ep24.3p1"
 HEADERS = {'Accept': 'application/json, text/plain', 'Content-Type' : 'application/json'}
@@ -95,15 +99,15 @@ class EPRestApi:
         if self._is_rest_service_available():
             # connect to a running application
             version = self.get('openapi.json')['info']['version']
-            print(f'Connected to BTC EmbeddedPlatform {version} at {host}:{self._PORT_}')
+            logger.info(f'Connected to BTC EmbeddedPlatform {version} at {host}:{self._PORT_}')
         else:
             # start the application
             if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, additional_vmargs)
             elif platform.system() == 'Linux': version = self._start_app_linux(license_location, lic, skip_matlab_start, additional_vmargs)
             
-            print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
+            logger.info(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
             self._connect_within_timeout(timeout)
-            print('\nBTC EmbeddedPlatform has started.')
+            logger.info('\nBTC EmbeddedPlatform has started.')
         self._apply_preferences(version)
         
 
@@ -146,6 +150,12 @@ class EPRestApi:
         response = self.put_req(urlappendix, requestBody, message)
         return self._extract_result(response)
 
+    def _get_loglevel(self, severity):
+        if severity == 'INFO': return logging.INFO
+        if severity == 'WARNING': return logging.WARNING
+        if severity == 'ERROR': return logging.ERROR
+        return logging.CRITICAL
+
     def _handle_error(self, e):
         """
         Handles an exception by printing the error message and the messages from the API.
@@ -157,20 +167,20 @@ class EPRestApi:
             - Retrieves and prints errors from the log file, if any.
             - Re-raises the encountered exception.
         """
-        print(f"\n\nEncountered error: {e}\n\n")
+        logger.error(f"\n\nEncountered error: {e}\n\n")
         
         messages = self.get_messages()
         if messages:
-            print(f"\n\nMessages: \n\n")
+            logger.info(f"\n\nMessages: \n\n")
             for msg in messages:
-                print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
+                log_level = self._get_loglevel(msg['severity'])
+                logger.log(level=log_level, msg=f"[{msg['date']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
 
         logged_errors = self.get_errors_from_log()
         if logged_errors:
-            print(f"\n\nErrors from log file{e}\n\n")
-            for entry in self.get_errors_from_log(self.start_time): print(entry)
+            logger.error(f"\n\nErrors from log file:\n{e}\n\n")
+            for entry in self.get_errors_from_log(self.start_time): logger.error(entry)
 
-        print(f"\n\nEncountered error: {e}\n\n")
         raise e
 
     # wrapper directly returns the relevant object if possible
@@ -210,10 +220,11 @@ class EPRestApi:
         try:
             messages = self.get_messages(search_string, severity)
             for msg in messages:
-                print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
-            print("\n")
+                log_level = self._get_loglevel(msg['severity'])
+                logger.log(level=log_level, msg=f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
+            logger.info("\n")
         except:
-            print("No messages available.")
+            logger.info("No messages available.")
     
     def get_messages(self, search_string=None, severity=None):
         """Returns all messages since the last profile create/profile load.
@@ -245,6 +256,7 @@ class EPRestApi:
     # Performs a get request on the given url extension
     def get_req(self, urlappendix, message=None):
         """Public access to this method is DEPRICATED. Use get() instead, unless you want to get the raw http response"""
+        logger.warning("DEPRICATED: Use get() instead of get_req().")
         url = self._precheck_get(urlappendix, message)
         try:
             response = requests.get(self._url(url))
@@ -255,7 +267,8 @@ class EPRestApi:
     # Performs a delete request on the given url extension
     def delete_req(self, urlappendix, message=None):
         """Public access to this method is DEPRICATED. Use delete() instead, unless you want to get the raw http response"""
-        if message: print(message)
+        logger.warning("DEPRICATED: Use delete() instead of delete_req().")
+        if message: logger.info(message)
         try:
             response = requests.delete(self._url(urlappendix), headers=HEADERS)
         except Exception as e:
@@ -265,9 +278,10 @@ class EPRestApi:
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
     def post_req(self, urlappendix, requestBody=None, message=None):
         """Public access to this method is DEPRICATED. Use post() instead, unless you want to get the raw http response"""
+        logger.warning("DEPRICATED: Use post() instead of post_req().")
         self._precheck_post(urlappendix)
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
-        if message: print(message)
+        if message: logger.info(message)
         try:
             if requestBody == None:
                 response = requests.post(self._url(url), headers=HEADERS)
@@ -280,8 +294,9 @@ class EPRestApi:
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
     def put_req(self, urlappendix, requestBody=None, message=None):
         """Public access to this method is DEPRICATED. Use put() instead, unless you want to get the raw http response"""
+        logger.warning("DEPRICATED: Use put() instead of put_req().")
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
-        if message: print(message)
+        if message: logger.info(message)
         try:
             if requestBody == None:
                 response = requests.put(self._url(url), headers=HEADERS)
@@ -300,14 +315,13 @@ class EPRestApi:
         """Waits until the REST service is available or the timeout is reached. Frequently checks if the EP process is still alive."""
         while not self._is_rest_service_available():
             if (time.time() - self.start_time) > timeout:
-                print(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
+                logger.error(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
                 raise Exception("Application didn't respond within the defined timeout.")
             elif (not self._is_ep_process_still_alive()):
-                print(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")
+                logger.error(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")
                 self.print_log_entries()
                 raise Exception("Application failed to start.")
             time.sleep(2)
-            print('.', end='')
 
 
     # extracts the response object which can be nested in different ways
@@ -364,7 +378,7 @@ class EPRestApi:
             response_content = response.content.decode('utf-8')
             # if the error is none of the excluded messages -> print messages, etc.
             if all(msg not in response_content for msg in EXCLUDED_ERROR_MESSAGES):
-                print(f"\n\nError: {response_content}\n\n")
+                logger.error(f"\n\n{response_content}\n\n")
                 self._handle_error(Exception(response_content))
         if response.status_code == 202:
             jsonResponse = response.json()
@@ -372,9 +386,7 @@ class EPRestApi:
                 if key == 'jobID':
                     while response.status_code == 202:
                         time.sleep(2)
-                        print('.', end='')
                         response = self._poll_long_running(value)
-                    print('')
         return response
 
     def _poll_long_running(self, jobID):
@@ -428,7 +440,7 @@ class EPRestApi:
             # apply preferences
             try:
                 self.put('preferences', preferences)
-                print(f"Applied preferences from the config")
+                logger.debug(f"Applied preferences from the config")
             except (Exception):
                 # if it fails to apply all preferences, apply individually
                 successfully_applied = 0
@@ -437,8 +449,8 @@ class EPRestApi:
                         self.put('preferences', [pref]) # apply single pref
                         successfully_applied += 1
                     except Exception:
-                        print(f"Failed to apply preference {pref}")
-                print(f"Successfully applied {successfully_applied} out of {len(preferences)} preferences.")
+                        logger.error(f"Failed to apply preference {pref}")
+                logger.debug(f"Successfully applied {successfully_applied} out of {len(preferences)} preferences.")
 
     def _rel_to_abs(self, rel_path):
         """Converts a relative path to an absolute path using the
@@ -452,7 +464,7 @@ class EPRestApi:
             # Create absolute path using root dir
             root_dir = os.path.dirname(os.environ[BTC_CONFIG_ENVVAR_NAME])
             return os.path.join(root_dir, rel_path)
-        print(f"Cannot convert relative path to absolute path because the environment variable {BTC_CONFIG_ENVVAR_NAME} is not set.")
+        logger.warning(f"Cannot convert relative path to absolute path because the environment variable {BTC_CONFIG_ENVVAR_NAME} is not set.")
         return None
     
     def _precheck_post(self, urlappendix):
@@ -463,7 +475,7 @@ class EPRestApi:
         """Prepares the URL appendix and sets the message marker date if the url appendix starts with 'profiles'."""
         if not 'progress' in urlappendix:
             # print this unless it's a progress query (to avoid flooding the console)
-            if message: print(message)
+            if message: logger.info(message)
         url_combined = urlappendix
         if urlappendix[:8] == 'profiles':
             # set/reset message marker
@@ -474,7 +486,7 @@ class EPRestApi:
             suffix = urlappendix[index_qmark:] if index_qmark > 0 else ""
             path = unquote(path) # unquote incase caller already quoted the path
             if path and not os.path.isfile(path) and self._is_localhost():
-                print(f"\nThe profile '{path}' cannot be found. Please ensure that the file is available.\n")
+                logger.critical(f"\nThe profile '{path}' cannot be found. Please ensure that the file is available.\n")
                 exit(1)
             path = quote(path, safe="")
             url_combined = 'profiles/' + path + suffix
@@ -538,7 +550,7 @@ class EPRestApi:
             version = '24.2p0'
         headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
         matlab_ip = os.environ['MATLAB_IP'] if 'MATLAB_IP' in os.environ else '127.0.0.1'
-        print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
+        logger.info(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
 
         args = [ os.environ['EP_INSTALL_PATH'] + '/ep',
             '-clearPersistedState', '-nosplash', '-console', '-consoleLog',
@@ -558,7 +570,7 @@ class EPRestApi:
             '-Dep.runtime.api.port=1109',
             '-Dep.matlab.ip.range=' + matlab_ip ]
         if additional_vmargs:
-            print(f"Applying additional vmargs: {additional_vmargs}")
+            logger.debug(f"Applying additional vmargs: {additional_vmargs}")
             args.extend(additional_vmargs)
         
         # start ep process
@@ -584,16 +596,16 @@ class EPRestApi:
             ml_port -= 100
         if not install_location.endswith('.exe'): install_location = f"{install_location}/rcp/ep.exe"
         if not os.path.isfile(install_location):
-            print(f'''\n\nBTC EmbeddedPlatform Executable (ep.exe) could not be found at the expected location ("{install_location}/rcp/ep.exe").
+            logger.critical(f'''\n\nBTC EmbeddedPlatform Executable (ep.exe) could not be found at the expected location ("{install_location}/rcp/ep.exe").
 - Please provide the correct version and installation root path:
 -> either using the version and install_root parameters of the EPRestApi constructor
 -> or via the properties epVersion and installationRoot in the config file
 - The installation root directory is expected to contain the sub directory ep{version}.\n\n''')
             raise Exception("EP Executable not found, cannot start BTC EmbeddedPlatform.")
         if not self._is_rest_addon_installed(version):
-            print(f'''\n\nThe REST API AddOn is not installed for BTC EmbeddedPlatform {version}\n\n''')
+            logger.critical(f'''\n\nThe REST API AddOn is not installed for BTC EmbeddedPlatform {version}\n\n''')
             raise Exception("Addon not installed.")
-        print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
+        logger.info(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
         args = f'"{install_location}"' + \
             ' -clearPersistedState' + \
             ' -application' + ' ' + headless_application_id + \
@@ -681,7 +693,7 @@ class EPRestApi:
                     else:
                         # Continuation of the current log entry
                         if not current_entry == None:
-                            current_entry += line + "\n"
+                            current_entry += line.strip() + "\n"
                 
                 # add last entry (if any)
                 if current_entry: log_entries.append(current_entry.strip())
@@ -689,7 +701,7 @@ class EPRestApi:
         return log_entries
 
     def print_log_entries(self):
-        for entry in self.get_errors_from_log(self.start_time): print(entry)
+        for entry in self.get_errors_from_log(self.start_time): logger.error(entry)
 
 
 # if called directly, starts EP based on the global config

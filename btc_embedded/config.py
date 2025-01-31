@@ -1,9 +1,12 @@
 import fnmatch
+import logging
 import os
 import platform
 from importlib import resources
 
 import yaml
+
+logger = logging.getLogger('BTC')
 
 BTC_CONFIG_ENVVAR_NAME = 'BTC_API_CONFIG_FILE'
 BTC_CONFIG_DEFAULTLOCATION = 'C:/ProgramData/BTC/ep/btc_config.yml'
@@ -26,7 +29,7 @@ def __get_global_config():
         global_config_file_path = get_config_path_from_resources()
     # load config
     config = __load_config(global_config_file_path)
-    print(f"Applying global config from '{global_config_file_path}'")
+    logger.debug(f"Applying global config from '{global_config_file_path}'")
     return config, global_config_file_path
 
 def get_project_specific_config(project_directory=os.getcwd(), project_config=None):
@@ -58,14 +61,14 @@ def get_merged_config(project_directory=os.getcwd(), silent=False, project_confi
     # get the global config
     config, path = __get_global_config()
     if config and not silent:
-        print(f"Applying global config from {path}")
+        logger.debug(f"Applying global config from {path}")
 
     # get the project specific config
     project_specific_config, path = get_project_specific_config(project_directory, project_config)
     if project_specific_config and not silent and path:
-        print(f"Applying project-specific config from {path}")
+        logger.debug(f"Applying project-specific config from {path}")
     elif project_specific_config and not silent:
-        print(f"Applying project-specific config")
+        logger.debug(f"Applying project-specific config")
     # merge them and return the merged config
     def recursive_update(d, u):
         for k, v in u.items():
