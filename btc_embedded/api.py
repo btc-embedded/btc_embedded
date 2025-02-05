@@ -1,4 +1,5 @@
 # Configure logger
+import inspect
 import logging
 import os
 import platform
@@ -17,8 +18,7 @@ from btc_embedded.config import (BTC_CONFIG_ENVVAR_NAME,
                                  get_global_config)
 from btc_embedded.helpers import install_btc_config, install_report_templates
 
-logger = logging.getLogger('BTC')
-
+# Constants
 VERSION_PATTERN = r'ep(\d+\.\d+[a-zA-Z]\d+)' # e.g. "ep24.3p1"
 HEADERS = {'Accept': 'application/json, text/plain', 'Content-Type' : 'application/json'}
 DATE_FORMAT_MESSAGES = '%d-%b-%Y %H:%M:%S'
@@ -30,6 +30,9 @@ EXCLUDED_ERROR_MESSAGES = [
 EXCLUDED_LOG_MESSAGES = [
     'Registry key could not be read: The system cannot find the file specified'
 ]
+LOGGING_DISABLED = 1337
+
+logger = logging.getLogger('btc_embedded')
 
 class EPRestApi:
     #Starter for the EP executable
@@ -45,7 +48,8 @@ class EPRestApi:
         additional_vmargs=[],
         timeout=120,
         skip_matlab_start=False,
-        skip_config_install=False):
+        skip_config_install=False,
+        log_level=logging.INFO):
         """
         Wrapper for the BTC EmbeddedPlatform REST API.
         When created without arguments, it uses the default install location & version defined in the global config (btc_config.yml).
@@ -62,7 +66,9 @@ class EPRestApi:
         - timeout (int): Timeout in seconds to start up BTC EmbeddedPlatform (default: 120).
         - skip_matlab_start (bool): Relevant in Docker-based use cases where Matlab is available but shall not be started (default: False).
         - skip_config_install (bool): Skips the automatic installation of a global btc_config.yml on your machine (default: False).
+        - log_level (int): The log level to use for the logger (default: logging.INFO).
         """
+        self.log_level = log_level
         self._PORT_ = "8080" if platform.system() == 'Linux' else str(port)
         self._HOST_ = host
         self.definitively_closed = False
@@ -71,6 +77,7 @@ class EPRestApi:
         self.config = None
         self.start_time = time.time()
         self.message_marker_date=int(time.time() * 1000)
+        self._init_logging()
 
         #
         # Prepare configuration
@@ -98,8 +105,12 @@ class EPRestApi:
         #
         if self._is_rest_service_available():
             # connect to a running application
+            requested_version = version
             version = self.get('openapi.json')['info']['version']
-            logger.info(f'Connected to BTC EmbeddedPlatform {version} at {host}:{self._PORT_}')
+            if requested_version and requested_version != version:
+                logger.warning(f"Requested version {requested_version} but connected to {version} already running on port {host}:{self._PORT_}.")
+            else:
+                logger.info(f'Connected to BTC EmbeddedPlatform {version} at {host}:{self._PORT_}')
         else:
             # start the application
             if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, additional_vmargs)
@@ -107,7 +118,7 @@ class EPRestApi:
             
             logger.info(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
             self._connect_within_timeout(timeout)
-            logger.info('\nBTC EmbeddedPlatform has started.')
+            logger.info('BTC EmbeddedPlatform has started.')
         self._apply_preferences(version)
         
 
@@ -204,9 +215,9 @@ class EPRestApi:
                 value = config['compiler']
             if platform.system() == 'Windows':
                 preferences = [ { 'preferenceName' : 'GENERAL_COMPILER_SETTING', 'preferenceValue' : value } ]
-                self.put_req('preferences', preferences)
+                self.put('preferences', preferences)
             else: # linux/docker
-                self.put_req('preferences', [ { 'preferenceName' : 'GENERAL_COMPILER_SETTING', 'preferenceValue' : 'GCC (64bit)' } ])
+                self.put('preferences', [ { 'preferenceName' : 'GENERAL_COMPILER_SETTING', 'preferenceValue' : 'GCC (64bit)' } ])
         except Exception as e:
             # needed because the API reacts weird when the compiler is already configured
             pass
@@ -256,7 +267,8 @@ class EPRestApi:
     # Performs a get request on the given url extension
     def get_req(self, urlappendix, message=None):
         """Public access to this method is DEPRICATED. Use get() instead, unless you want to get the raw http response"""
-        logger.warning("DEPRICATED: Use get() instead of get_req().")
+        if not inspect.stack()[1].function in ['get', '_poll_long_running' ]:
+            logger.warning("DEPRICATED: Use get() instead of get_req().")
         url = self._precheck_get(urlappendix, message)
         try:
             response = requests.get(self._url(url))
@@ -267,7 +279,8 @@ class EPRestApi:
     # Performs a delete request on the given url extension
     def delete_req(self, urlappendix, message=None):
         """Public access to this method is DEPRICATED. Use delete() instead, unless you want to get the raw http response"""
-        logger.warning("DEPRICATED: Use delete() instead of delete_req().")
+        if inspect.stack()[1].function != 'delete':
+            logger.warning("DEPRICATED: Use delete() instead of delete_req().")
         if message: logger.info(message)
         try:
             response = requests.delete(self._url(urlappendix), headers=HEADERS)
@@ -278,7 +291,8 @@ class EPRestApi:
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
     def post_req(self, urlappendix, requestBody=None, message=None):
         """Public access to this method is DEPRICATED. Use post() instead, unless you want to get the raw http response"""
-        logger.warning("DEPRICATED: Use post() instead of post_req().")
+        if inspect.stack()[1].function != 'post':
+            logger.warning("DEPRICATED: Use post() instead of post_req().")
         self._precheck_post(urlappendix)
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
         if message: logger.info(message)
@@ -294,7 +308,8 @@ class EPRestApi:
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
     def put_req(self, urlappendix, requestBody=None, message=None):
         """Public access to this method is DEPRICATED. Use put() instead, unless you want to get the raw http response"""
-        logger.warning("DEPRICATED: Use put() instead of put_req().")
+        if inspect.stack()[1].function != 'put':
+            logger.warning("DEPRICATED: Use put() instead of put_req().")
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
         if message: logger.info(message)
         try:
@@ -702,6 +717,15 @@ class EPRestApi:
 
     def print_log_entries(self):
         for entry in self.get_errors_from_log(self.start_time): logger.error(entry)
+
+    def _init_logging(self):
+        logger.setLevel(self.log_level)
+        # if logging is not disabled and there are no handlers -> add console handler
+        if not self.log_level == LOGGING_DISABLED and not logger.hasHandlers():
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.DEBUG)
+            console_handler.setFormatter(logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+            logger.addHandler(console_handler)
 
 
 # if called directly, starts EP based on the global config

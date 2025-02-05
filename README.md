@@ -18,7 +18,6 @@ When creating the API object without further parameters, the module looks for an
 ```Applying global config from 'C:\ProgramData\BTC\ep\btc_config.yml'
 Waiting for BTC EmbeddedPlatform 24.2p0 to be available:
 Connecting to BTC EmbeddedPlatform REST API at http://localhost:1337
-....
 BTC EmbeddedPlatform has started.
 Applied preferences from the config
 ```
@@ -113,3 +112,36 @@ tolerances:
 - Two things are needed to achieve this:
 1. For each individual project (e.g., a workflow that works on one model/epp), a result object must be created (see https://github.com/btc-embedded/btc-ci-workflow/blob/main/examples/btc_test_workflow.py#L58).
 2. The result objects for each project needs to be added to a list and this list will then be passed used for creating the report (see https://github.com/btc-embedded/btc-ci-workflow/blob/main/examples/test_multiple_projects.py)
+
+
+## Logging 
+This module uses a logger named 'btc_embedded' which you can access by its name.
+
+### Configure custom logging
+```python
+import logging
+
+# Access btc_embedded logger
+logger = logging.getLogger('btc_embedded')
+
+# Collect logging output in a file
+log_file = os.path.join(os.path.dirname(__file__), 'btc_embedded.log')
+file_handler = logging.FileHandler(log_file)
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+logger.addHandler(file_handler)
+```
+### Configure log level
+Chosing a log level lower than the one configured for the logger will have no effect. By default, the module will log using the INFO level. You can adapt this when creating the API object:
+```python
+# Create BTC API object with a customized log level
+ep = EPRestApi(log_level=logging.DEBUG)
+```
+### Disable logging
+If you wish to disable logging entirely, simply set the log level to LOGGING_DISABLED:
+```python
+from btc_embedded import EPRestApi, LOGGING_DISABLED
+
+# disable logging
+ep = EPRestApi(log_level=LOGGING_DISABLED)
+```
