@@ -330,11 +330,17 @@ class EPRestApi:
         If this data has a result field (common for post requests), its content is returned, otherwise the data object itself.
         If the response object has no data, the response iteslf is returned."""
         try:
-            result = response.json()
-            if 'result' in result:
-                return result['result']
+            content_type = response.headers.get('Content-Type')
+            if content_type == 'application/json':
+                result = response.json()
+                if 'result' in result:
+                    return result['result']
+                else:
+                    return result
+            elif content_type == 'text/plain':
+                return response.text
             else:
-                return result
+                return response
         except Exception:
             return response
 
