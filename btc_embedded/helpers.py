@@ -1,4 +1,3 @@
-import logging
 import os
 import re
 import shutil
@@ -8,8 +7,6 @@ import yaml
 
 from btc_embedded.config import (BTC_CONFIG_DEFAULTLOCATION,
                                  BTC_CONFIG_ENVVAR_NAME, get_resource_path)
-
-logger = logging.getLogger('BTC')
 
 VERSION_PATTERN_2 = r'(\d+\.\d+[a-zA-Z]\d+)' # e.g.   "24.3p1"
 KNOWN_FLOAT_TYPES = [ 'double', 'single', 'float', 'float32', 'float64', 'real' ]
@@ -69,8 +66,8 @@ def install_btc_config():
             with open(global_config, 'w') as f:
                 yaml.safe_dump(config, f)
             
-            logger.info(f"Applied initial btc_config template to '{global_config}'.")
-            logger.info(f"""Please verify the initial configuration:
+            print(f"Applied initial btc_config template to '{global_config}'.")
+            print(f"""Please verify the initial configuration:
     - BTC EmbeddedPlatform {ep_version} (installed at: '{install_location}')
     - {highest_ml_version}
     - Compiler: {config['preferences']['GENERAL_COMPILER_SETTING']}
@@ -83,9 +80,9 @@ def install_report_templates(template_folder):
         os.makedirs(template_folder, exist_ok=True)
         resources_folder = get_resource_path('projectreport_templates')
         shutil.copytree(resources_folder, template_folder, ignore=xml_filter, dirs_exist_ok=True)
-        logger.info(f"Installed project report templates to '{template_folder}'")
+        print(f"Installed project report templates to '{template_folder}'")
     except:
-        logger.warning(f"[WARNING] Could not install report templates to '{template_folder}'")
+        print(f"[WARNING] Could not install report templates to '{template_folder}'")
 
 def set_tolerances(ep, tol_fxp={ 'abs': '1*LSB' }, tol_flp={ 'abs': 1E-16, 'rel': 1E-8 }, tol_regex=[], use_case='B2B'):
     """Tolerances can be defined for RBT (requirements-based tests) and B2B (back-to-back & regression tests)
