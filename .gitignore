@@ -17,7 +17,7 @@
 !Dockerfile
 !.gitignore
 !*.bash
-
+!public/*.png
 .idea/
 .pypirc
 build/
