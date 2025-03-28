@@ -25,7 +25,6 @@ This docker image enables you to easily package your toolchain for CI. Whether y
 # Supported versions
 | Tag               | Supported MATLAB versions | Supported TargetLink versions |
 |-------------------|---------------------------|-------------------------------|
-<!-- | `latest` `25.1p0` | R2023b - R2024b           | TL 23.1 - TL 24.1             | -->
 | `latest` `24.3p0` | R2022b - R2024b           | TL 5.2 - TL 23.1              |
 | `24.2p0`          | R2022b - R2024a           | TL 5.2 - TL 23.1              |
 | `24.1p0`          | R2022b - R2023b           | TL 5.2 - TL 23.1              |
