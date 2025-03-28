@@ -1,7 +1,7 @@
 # Using BTC EmbeddedPlatform with Docker
 ![BTC EmbeddedPlatform Logo](https://github.com/btc-embedded/btc_embedded/blob/main/public/btc-logo.png?raw=true)
 
-BTC EmbeddedPlatform image ISO 26262 certified test of safety critical Simulink models and C code.
+BTC EmbeddedPlatform docker image for ISO 26262 certified test of safety critical Simulink models and C code.
 
 # What is BTC EmbeddedPlatform?
 
