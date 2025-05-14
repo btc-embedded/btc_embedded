@@ -145,6 +145,16 @@ class EPRestApi:
         """Returns the result object, or the response, if no result object is available."""
         response = self.put_req(urlappendix, requestBody, message)
         return self._extract_result(response)
+    
+    def patch(self, urlappendix, requestBody=None, message=None):
+        """Returns the result object, or the response, if no result object is available."""
+        response = self.patch_req(urlappendix, requestBody, message)
+        return self._extract_result(response)
+    
+    # wrapper directly returns the relevant object if possible
+    def delete(self, urlappendix, message=None):
+        """Performs a delete request and returns the response object"""
+        return self.delete_req(urlappendix, message)
 
     def _handle_error(self, e):
         """
@@ -157,7 +167,7 @@ class EPRestApi:
             - Retrieves and prints errors from the log file, if any.
             - Re-raises the encountered exception.
         """
-        print(f"\n\nEncountered error: {e}\n\n")
+        print(f"\n\nEncountered error:\n{e}\n\n")
         
         messages = self.get_messages()
         if messages:
@@ -167,16 +177,10 @@ class EPRestApi:
 
         logged_errors = self.get_errors_from_log()
         if logged_errors:
-            print(f"\n\nErrors from log file{e}\n\n")
-            for entry in self.get_errors_from_log(self.start_time): print(entry)
+            print(f"\n\nErrors from log file\n{e}\n\n")
+            for entry in self.get_errors_from_log(self.start_time): print(entry.strip())
 
-        print(f"\n\nEncountered error: {e}\n\n")
         raise e
-
-    # wrapper directly returns the relevant object if possible
-    def delete(self, urlappendix, message=None):
-        """Performs a delete request and returns the response object"""
-        return self.delete_req(urlappendix, message)
 
     def set_compiler(self, config=None, value=None):
         """
@@ -230,6 +234,8 @@ class EPRestApi:
             if severity: path += ('&' if search_string else '?') + f"severity={severity}"
             try:
                 messages = self.get(path)
+                if isinstance(messages, str):
+                    messages = []
                 try:
                     messages.sort(key=lambda msg: datetime.strptime(msg['date'], DATE_FORMAT_MESSAGES))
                 except:
@@ -253,11 +259,14 @@ class EPRestApi:
         return self._check_long_running(response)
     
     # Performs a delete request on the given url extension
-    def delete_req(self, urlappendix, message=None):
+    def delete_req(self, urlappendix, requestBody=None, message=None):
         """Public access to this method is DEPRICATED. Use delete() instead, unless you want to get the raw http response"""
         if message: print(message)
         try:
-            response = requests.delete(self._url(urlappendix), headers=HEADERS)
+            if requestBody == None:
+                response = requests.delete(self._url(urlappendix), headers=HEADERS)
+            else:
+                response = requests.delete(self._url(urlappendix), json=requestBody, headers=HEADERS)
         except Exception as e:
             self._handle_error(e)
         return self._check_long_running(response)
@@ -287,6 +296,20 @@ class EPRestApi:
                 response = requests.put(self._url(url), headers=HEADERS)
             else:
                 response = requests.put(self._url(url), json=requestBody, headers=HEADERS)
+        except Exception as e:
+            self._handle_error(e)
+        return self._check_long_running(response)
+    
+    # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
+    def patch_req(self, urlappendix, requestBody=None, message=None):
+        """Public access to this method is DEPRICATED. Use patch() instead, unless you want to get the raw http response"""
+        url = urlappendix.replace('\\', '/').replace(' ', '%20')
+        if message: print(message)
+        try:
+            if requestBody == None:
+                response = requests.patch(self._url(url), headers=HEADERS)
+            else:
+                response = requests.patch(self._url(url), json=requestBody, headers=HEADERS)
         except Exception as e:
             self._handle_error(e)
         return self._check_long_running(response)
