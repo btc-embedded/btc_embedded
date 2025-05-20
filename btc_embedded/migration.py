@@ -295,24 +295,37 @@ def src_03_generate_vectors(ep, scope_uid, model_name, vector_gen_settings, resu
     try:
         step_result = { 'stepName' : 'Generate Vectors' }
         update_report_running(model_name, step_result)
-        if vector_gen_settings:
-            vector_gen_settings['scopeUid'] = scope_uid
-        else:
-            vector_gen_settings = {
-                'scopeUid' : scope_uid,
-                'pllString': 'STM',
-                'engineSettings' : {
-                    'timeoutSeconds': 300,
-                    'engineAtg' : { 'timeoutSecondsPerSubsystem' : 100 },
-                    'engineCv' : {
-                        'coreEngines' : [ { 'name' : 'ISAT' }, { 'name' : 'CBMC' }] ,
-                        'maximumNumberOfThreads' : 2
+        if ep.version >= '22.3p0': # new style vector generation
+            if vector_gen_settings: vector_gen_settings['scopeUid'] = scope_uid
+            else:
+                vector_gen_settings = {
+                    'scopeUid' : scope_uid,
+                    'pllString': 'STM',
+                    'engineSettings' : {
+                        'timeoutSeconds': 300,
+                        'engineAtg' : { 'timeoutSecondsPerSubsystem' : 100 },
+                        'engineCv' : {
+                            'coreEngines' : [ { 'name' : 'ISAT' }, { 'name' : 'CBMC' }] ,
+                            'maximumNumberOfThreads' : 2
+                        }
                     }
                 }
-            }
+        else: # legacy support for old API
+            if vector_gen_settings:
+                scope = ep.get(f"scopes/{scope_uid}")
+                vector_gen_settings['scope'] = scope
+            else:
+                vector_gen_settings = ep.get('coverage-generation')
+                vector_gen_settings['targetDefinitions'] = []
+                vector_gen_settings['pllString'] = 'MCDC'
+                vector_gen_settings['engineSettings']['engineCv']['coreEngines'] = [
+                    { 'name' : 'CBMC', 'enabled' : True },
+                    { 'name' : 'ISAT', 'enabled' : True }
+                ]
         ep.post('coverage-generation', vector_gen_settings, message="Generating vectors")
-        b2b_coverage = ep.get(f"scopes/{scope_uid}/coverage-results-b2b")
-        print('Coverage ' + "{:.2f}%".format(b2b_coverage['MCDCPropertyCoverage']['handledPercentage']))
+        if ep.version >= '22.2p0':
+            b2b_coverage = ep.get(f"scopes/{scope_uid}/coverage-results-b2b")
+            print('Coverage ' + "{:.2f}%".format(b2b_coverage['MCDCPropertyCoverage']['handledPercentage']))
         step_result['status'] = 'PASSED'
     except Exception as e:
         handle_error(ep, step_result, error=e, step_start_time=start_time)
@@ -324,17 +337,31 @@ def src_04_reference_simulation(ep, scope_uid, test_mil, export_executions, resu
     try:
         step_result = { 'stepName' : 'Reference Simulation' }
         update_report_running(model_name, step_result)
-
-        mil_sil_configs = ep.get('execution-configs')['execConfigNames']
-        payload = { 'execConfigNames' : mil_sil_configs if test_mil else ['SIL'] }
-        ep.post(f"scopes/{scope_uid}/testcase-simulation", payload, message=f"Reference Simulation on {payload['execConfigNames']}")
+        
+        if ep.version >= '22.1p0':
+            mil_sil_configs = ep.get('execution-configs')['execConfigNames'] if test_mil else ['SIL']
+            payload = { 'execConfigNames' : mil_sil_configs }
+            ep.post(f"scopes/{scope_uid}/testcase-simulation", payload, message=f"Reference Simulation on {payload['execConfigNames']}")
+        else: # legacy support for old API
+            archs = ep.get('architectures')
+            mil_cfg = None
+            if any('Simulink' in arch['architectureKind'] for arch in archs): mil_cfg = 'SL MIL'
+            if any('Targetlink' in arch['architectureKind'] for arch in archs): mil_cfg = 'TL MIL'
+            mil_sil_configs = [ mil_cfg, 'SIL' ] if test_mil else ['SIL']
+            scopes = ep.get('scopes')
+            payload = {
+                'refMode' : mil_sil_configs[0],
+                'compMode' : (mil_sil_configs[1] if len(mil_sil_configs) == 2 else mil_sil_configs[0]),
+                'UIDs' : [ scope['uid'] for scope in scopes ],
+            }
+            ep.post('scopes/b2b', payload, message=f"Reference Simulation on {mil_sil_configs}")
 
         # Store MIL and SIL executions for comparison
         all_execution_records = ep.get('execution-records')
         payload = { "folderKind": "EXECUTION_RECORD" }
         
         # SIL
-        payload['folderName'] = 'old-sil'
+        if ep.version >= '22.1p0': payload['folderName'] = 'old-sil'
         old_sil_folder = ep.post('folders', payload)
         sil_execution_records_uids = [ er['uid'] for er in all_execution_records if er['executionConfig'] == 'SIL']
         ep.put(f"folders/{old_sil_folder['uid']}/execution-records", { 'UIDs' : sil_execution_records_uids })
@@ -345,7 +372,7 @@ def src_04_reference_simulation(ep, scope_uid, test_mil, export_executions, resu
 
         # MIL
         if test_mil:
-            payload['folderName'] = 'old-mil'
+            if ep.version >= '22.1p0': payload['folderName'] = 'old-mil'
             old_mil_folder = ep.post('folders', payload)
             mil_execution_config = next(cfg for cfg in mil_sil_configs if 'MIL' in cfg)
             mil_execution_records_uids = [ er['uid'] for er in all_execution_records if er['executionConfig'] == mil_execution_config]
@@ -487,14 +514,30 @@ def tgt_06_tolerances(ep, model_name, results):
     return step_result
 
 def tgt_06_regression_test_sil(ep, model_name, results):
+    def legacy_find_folder(ep, exe_config, er_custom_folders):
+        for folder in er_custom_folders:
+            records = ep.get(f"folders/{folder['uid']}/execution-records")
+            if records and records[0]['executionConfig'] == exe_config:
+                return folder
+        return None
+
     start_time = time.time()
     try:
         step_result = { 'stepName' : 'Regression Test (SIL)' }
+        sil_test = None
         update_report_running(model_name, step_result)
 
+        # identify old folder
+        er_custom_folders = [folder for folder in ep.get('folders?kind=EXECUTION_RECORD') if not folder['isDefault']]
+        old_sil_folder = next((folder for folder in er_custom_folders if folder['name'] == 'old-sil'), None)
+        if not old_sil_folder:
+            # legacy support for old API
+            old_sil_folder = legacy_find_folder(ep,  'SIL', er_custom_folders)
+            if not old_sil_folder: raise Exception("No SIL folder found in execution records")
+
+        # new folder
         payload = {'folderKind': 'EXECUTION_RECORD', 'folderName' : 'new-sil' }
         new_sil_folder = ep.post('folders', payload)
-        old_sil_folder = ep.get('folders?name=old-sil')[0]
         # regression test
         payload = { 
             'compMode': 'SIL',
@@ -571,15 +614,16 @@ def handle_error(ep, step_result, epp_file=None, error="", step_start_time=None)
     step_result['message'] = f"Error in step '{step_result['stepName']}': {shortened_error}"
     if epp_file: ep.put('profiles', { 'path': epp_file }, message="Saving profile after error")
     # export messages to {model_name}_messages.html
-    global message_report_file
-    os.makedirs(os.path.dirname(message_report_file), exist_ok=True)
-    message_report_uri = f'messages/message-report?file-name={quote(message_report_file, safe="")}'
-    if ep.message_marker_date:
-        message_report_uri += f'&marker-date={ep.message_marker_date}'
-    ep.post(message_report_uri)
-    errors_from_log = ep.get_errors_from_log(step_start_time)
-    with open(f"{message_report_file[:-13]}error.log", 'w') as log:
-        log.writelines(errors_from_log)
+    if ep.version >= '22.2p0':
+        global message_report_file
+        os.makedirs(os.path.dirname(message_report_file), exist_ok=True)
+        message_report_uri = f'messages/message-report?file-name={quote(message_report_file, safe="")}'
+        if ep.message_marker_date:
+            message_report_uri += f'&marker-date={ep.message_marker_date}'
+        ep.post(message_report_uri)
+        errors_from_log = ep.get_errors_from_log(step_start_time)
+        with open(f"{message_report_file[:-13]}error.log", 'w') as log:
+            log.writelines(errors_from_log)
 
 def start_ep_and_configure_matlab(version, ep):
     if not ep: ep = EPRestApi()

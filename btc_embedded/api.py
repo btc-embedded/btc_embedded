@@ -1,3 +1,4 @@
+import inspect
 import os
 import platform
 import re
@@ -19,7 +20,10 @@ VERSION_PATTERN = r'ep(\d+\.\d+[a-zA-Z]\d+)' # e.g. "ep24.3p1"
 HEADERS = {'Accept': 'application/json, text/plain', 'Content-Type' : 'application/json'}
 DATE_FORMAT_MESSAGES = '%d-%b-%Y %H:%M:%S'
 DATE_FORMAT_LOGFILE = '%Y-%m-%d %H:%M:%S'
+MSG_RESOURCE_NOT_FOUND = 'The resource has not been found'
+MSG_BAD_REQUEST = 'The provided input does not have a valid format'
 EXCLUDED_ERROR_MESSAGES = [
+    'The compiler is not valid or is not available.',
     'The compiler is already defined',
     'No message found for the given query.'
 ]
@@ -84,7 +88,7 @@ class EPRestApi:
             match = re.search(VERSION_PATTERN, install_location)
             if match: version = match.group(1)
         # fallback: determine based on config
-        if not (version and install_location) and 'installationRoot' in self.config and 'epVersion' in self.config:
+        if not (version and install_location) and 'installationRoot' in self.config and (version or 'epVersion' in self.config):
             version = version or self.config['epVersion']
             install_location = f"{self.config['installationRoot']}/ep{version}"
         self._set_log_file_location(version)
@@ -92,7 +96,7 @@ class EPRestApi:
         #
         # Start / Connect to the BTC EmbeddedPlatform
         #
-        if self._is_rest_service_available():
+        if self._is_rest_service_available(version):
             # connect to a running application
             version = self.get('openapi.json')['info']['version']
             print(f'Connected to BTC EmbeddedPlatform {version} at {host}:{self._PORT_}')
@@ -102,9 +106,10 @@ class EPRestApi:
             elif platform.system() == 'Linux': version = self._start_app_linux(license_location, lic, skip_matlab_start, additional_vmargs)
             
             print(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
-            self._connect_within_timeout(timeout)
+            self._connect_within_timeout(timeout, version)
             print('\nBTC EmbeddedPlatform has started.')
         self._apply_preferences(version)
+        self.version = version
         
 
     # - - - - - - - - - - - - - - - - - - - - 
@@ -156,7 +161,7 @@ class EPRestApi:
         """Performs a delete request and returns the response object"""
         return self.delete_req(urlappendix, message)
 
-    def _handle_error(self, e):
+    def _handle_error(self, e, urlappendix, payload=None):
         """
         Handles an exception by printing the error message and the messages from the API.
         Args:
@@ -167,7 +172,20 @@ class EPRestApi:
             - Retrieves and prints errors from the log file, if any.
             - Re-raises the encountered exception.
         """
-        print(f"\n\nEncountered error:\n{e}\n\n")
+        # If _handle_error is already in the call stack, raise immediately to avoid recursion
+        count = sum(1 for frame in inspect.stack() if frame.function == '_handle_error')
+        if count > 2: raise e
+
+        # special handling for "resource not found -> give information about request"
+        if (MSG_RESOURCE_NOT_FOUND in str(e)):
+            print(f"\n\nYou requested a resource that doesn't exist: '{urlappendix}'\n\n")
+            raise e
+        elif (MSG_BAD_REQUEST in str(e)):
+            import json
+            print(f"\n\nYou sent an invalid request to '{urlappendix}':\n{json.dumps(payload, indent=4)}\n\n")
+            raise e
+        else:
+            print(f"\n\nEncountered error:\n{e}\n\n")
         
         messages = self.get_messages()
         if messages:
@@ -255,8 +273,8 @@ class EPRestApi:
         try:
             response = requests.get(self._url(url))
         except Exception as e:
-            self._handle_error(e)
-        return self._check_long_running(response)
+            self._handle_error(e, urlappendix)
+        return self._check_long_running(response, urlappendix)
     
     # Performs a delete request on the given url extension
     def delete_req(self, urlappendix, requestBody=None, message=None):
@@ -268,8 +286,8 @@ class EPRestApi:
             else:
                 response = requests.delete(self._url(urlappendix), json=requestBody, headers=HEADERS)
         except Exception as e:
-            self._handle_error(e)
-        return self._check_long_running(response)
+            self._handle_error(e, urlappendix, requestBody)
+        return self._check_long_running(response, urlappendix, requestBody)
 
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
     def post_req(self, urlappendix, requestBody=None, message=None):
@@ -283,8 +301,8 @@ class EPRestApi:
             else:
                 response = requests.post(self._url(url), json=requestBody, headers=HEADERS)
         except Exception as e:
-            self._handle_error(e)
-        return self._check_long_running(response)
+            self._handle_error(e, urlappendix, requestBody)
+        return self._check_long_running(response, urlappendix, requestBody)
 
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
     def put_req(self, urlappendix, requestBody=None, message=None):
@@ -297,8 +315,8 @@ class EPRestApi:
             else:
                 response = requests.put(self._url(url), json=requestBody, headers=HEADERS)
         except Exception as e:
-            self._handle_error(e)
-        return self._check_long_running(response)
+            self._handle_error(e, urlappendix, requestBody)
+        return self._check_long_running(response, urlappendix, requestBody)
     
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
     def patch_req(self, urlappendix, requestBody=None, message=None):
@@ -311,17 +329,17 @@ class EPRestApi:
             else:
                 response = requests.patch(self._url(url), json=requestBody, headers=HEADERS)
         except Exception as e:
-            self._handle_error(e)
-        return self._check_long_running(response)
+            self._handle_error(e, urlappendix, requestBody)
+        return self._check_long_running(response, urlappendix, requestBody)
 
 
     # - - - - - - - - - - - - - - - - - - - - 
     #   PRIVATE HELPER FUNCTIONS
     # - - - - - - - - - - - - - - - - - - - - 
 
-    def _connect_within_timeout(self, timeout):
+    def _connect_within_timeout(self, timeout, version):
         """Waits until the REST service is available or the timeout is reached. Frequently checks if the EP process is still alive."""
-        while not self._is_rest_service_available():
+        while not self._is_rest_service_available(version):
             if (time.time() - self.start_time) > timeout:
                 print(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
                 raise Exception("Application didn't respond within the defined timeout.")
@@ -354,7 +372,7 @@ class EPRestApi:
             return response
 
     # Checks if the REST Server is available
-    def _is_rest_service_available(self):
+    def _is_rest_service_available(self, requested_version=None):
         """
         Checks if the REST service is available by sending a GET request to the '/test' endpoint.
 
@@ -363,16 +381,25 @@ class EPRestApi:
         """
         try:
             response = requests.get(self._url('/test'))
+            if response.ok and requested_version:
+                version = self.get('openapi.json')['info']['version']
+                if version != requested_version:
+                    old_port = self._PORT_
+                    new_port = str(int(old_port) + 1)
+                    print(f"Port {old_port} is already in use by an instance of BTC EmbeddedPlatform {version}. Trying port {new_port} for version {requested_version}...")
+                    self._PORT_ = new_port
+                else:
+                    return True
         except requests.exceptions.ConnectionError:
-            return False
-        return response.ok
+            pass
+        return False
 
     # it's not important if the path starts with /, ep/ or directly with a resource
     def _url(self, path):
         return f"{self._HOST_}:{self._PORT_}/ep/{path.lstrip('/')}".replace('/ep/ep/', '/ep/')
 
     # This method is used to poll a request until the progress is done.
-    def _check_long_running(self, response):
+    def _check_long_running(self, response, urlappendix, payload=None):
         """
         Checks the status of a long-running operation and handles errors.
 
@@ -393,8 +420,7 @@ class EPRestApi:
             response_content = response.content.decode('utf-8')
             # if the error is none of the excluded messages -> print messages, etc.
             if all(msg not in response_content for msg in EXCLUDED_ERROR_MESSAGES):
-                print(f"\n\nError: {response_content}\n\n")
-                self._handle_error(Exception(response_content))
+                self._handle_error(Exception(response_content), urlappendix, payload)
         if response.status_code == 202:
             jsonResponse = response.json()
             for key, value in jsonResponse.items():
@@ -407,7 +433,11 @@ class EPRestApi:
         return response
 
     def _poll_long_running(self, jobID):
-        return self.get_req('/progress?progress-id=' + jobID)
+        # before 21.3, the jobID was appended to the URL, after 21.3 it is passed as a query parameter
+        if self.version < '21.3p0':
+            return self.get_req('/progress/' + jobID)
+        else:
+            return self.get_req('/progress?progress-id=' + jobID)
 
     def _set_log_file_location(self, version):
         if platform.system() == 'Windows':
