@@ -157,9 +157,9 @@ class EPRestApi:
         return self._extract_result(response)
     
     # wrapper directly returns the relevant object if possible
-    def delete(self, urlappendix, message=None):
+    def delete(self, urlappendix, requestBody=None, message=None):
         """Performs a delete request and returns the response object"""
-        return self.delete_req(urlappendix, message)
+        return self.delete_req(urlappendix, requestBody, message)
 
     def _handle_error(self, e, urlappendix, payload=None):
         """
