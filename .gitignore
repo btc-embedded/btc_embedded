@@ -17,6 +17,8 @@
 !Dockerfile
 !.gitignore
 !*.bash
+!*.ps1
+!*.toml
 !public/*.png
 .idea/
 .pypirc
