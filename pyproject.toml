@@ -8,7 +8,7 @@ name = "btc_embedded"
 authors = [
   {name = "Thabo Krick", email = "thabo.krick@btc-embedded.com"},]
 
-version = "25.1.3beta1"
+version = "25.1.3beta2"
 
 license = "MIT"
 description="API wrapper for BTC EmbeddedPlatform REST API"
