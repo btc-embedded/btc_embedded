@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+
+name = "btc_embedded"
+authors = [
+  {name = "Thabo Krick", email = "thabo.krick@btc-embedded.com"},]
+
+version = "25.1.3beta2"
+
+license = "MIT"
+description="API wrapper for BTC EmbeddedPlatform REST API"
+
+dependencies = [
+    "requests",
+    "pyyaml",
+]
+
+
+classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Intended Audience :: Developers',
+        'Topic :: Software Development :: Testing',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+    ]
+[project.urls]
+Homepage = "https://github.com/pypa/sampleproject"
+
+[tool.setuptools]
+packages=["btc_embedded"]
