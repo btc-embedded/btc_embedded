@@ -1,6 +1,8 @@
+import json
 import os
 import re
 import shutil
+import subprocess
 from decimal import Decimal
 
 import yaml
@@ -287,3 +289,22 @@ def _convert_lsb_based_tolerances(tolerances, resolution):
         atr_index = rel_str.index('*')
         factor = rel_str[0:atr_index]
         tolerances['rel'] = str(Decimal(factor) * lsb_value)
+
+
+def get_processes_by_name(name):
+    ps_script = f"""
+    Get-Process -Name "{name}" -ErrorAction SilentlyContinue |
+    Where-Object {{ $_.Path }} |
+    Select-Object Name, Path |
+    ConvertTo-Json
+    """
+    result = subprocess.run(
+        ['powershell', '-Command', ps_script],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
+    )
+    try:
+        data = json.loads(result.stdout)
+        return [(p["Name"], p["Path"]) for p in (data if isinstance(data, list) else [data])]
+    except json.JSONDecodeError:
+        return []
+

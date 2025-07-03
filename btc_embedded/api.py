@@ -5,6 +5,7 @@ import re
 import shutil
 import signal
 import subprocess
+import threading
 import time
 from datetime import datetime
 from urllib.parse import quote, unquote
@@ -14,7 +15,8 @@ import requests
 from btc_embedded.config import (BTC_CONFIG_ENVVAR_NAME,
                                  get_config_path_from_resources,
                                  get_global_config)
-from btc_embedded.helpers import install_btc_config, install_report_templates
+from btc_embedded.helpers import (get_processes_by_name, install_btc_config,
+                                  install_report_templates)
 
 VERSION_PATTERN = r'ep(\d+\.\d+[a-zA-Z]\d+)' # e.g. "ep24.3p1"
 HEADERS = {'Accept': 'application/json, text/plain', 'Content-Type' : 'application/json'}
@@ -274,6 +276,8 @@ class EPRestApi:
             response = requests.get(self._url(url))
         except Exception as e:
             self._handle_error(e, urlappendix)
+        finally:
+            self._the_watch_has_ended(urlappendix)
         return self._check_long_running(response, urlappendix)
     
     # Performs a delete request on the given url extension
@@ -537,6 +541,8 @@ class EPRestApi:
                 exit(1)
             path = quote(path, safe="")
             url_combined = 'profiles/' + path + suffix
+            # watch profile migration status
+            threading.Thread(target=self._watch_profile_migration, daemon=True).start()
         
         return url_combined
 
@@ -750,6 +756,35 @@ class EPRestApi:
     def print_log_entries(self):
         for entry in self.get_errors_from_log(self.start_time): print(entry)
 
+    def _watch_profile_migration(self):
+        """Can be called (async) to report the status of a profile migration."""
+        if platform.system() == 'Windows':
+            global the_watch_has_ended
+            the_watch_has_ended = False
+            try:
+                seen_versions = set()
+                while True:
+                    time.sleep(5)
+                    if the_watch_has_ended == True: break
+                    processes = get_processes_by_name('ep_profilemigrate')
+                    if processes:
+                        _, path = processes[0]
+                        version = os.path.basename(os.path.dirname(path)).rsplit('.', 1)[0]
+                        if version not in seen_versions:
+                            seen_versions.add(version)
+                            print(f"Migrating profile from {version}...")
+                    else: break
+            except:
+                return
+            finally:
+                the_watch_has_ended = True
+
+    def _the_watch_has_ended(self, urlappendix):
+        """In case a watcher has been watching the status of a
+        profile migration, it can stop watching now the process has ended."""
+        if urlappendix[:8] == 'profiles':
+            global the_watch_has_ended
+            the_watch_has_ended = True
 
 # if called directly, starts EP based on the global config
 if __name__ == '__main__':

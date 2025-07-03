@@ -367,8 +367,9 @@ def src_04_reference_simulation(ep, scope_uid, test_mil, export_executions, resu
         ep.put(f"folders/{old_sil_folder['uid']}/execution-records", { 'UIDs' : sil_execution_records_uids })
         # export to directory
         if export_executions:
-            sil_er_dir = os.path.join(result_dir, 'ER', 'SIL')
-            ep.post('execution-records-export', { 'UIDs' : sil_execution_records_uids, 'exportDirectory': sil_er_dir })
+            er_dir = os.path.join(result_dir, model_name, 'ER')
+            sil_er_dir = os.path.join(er_dir, 'SIL')
+            ep.post('execution-records-export', { 'UIDs' : sil_execution_records_uids, 'exportDirectory': sil_er_dir, 'exportFormat' : 'MDF' })
 
         # MIL
         if test_mil:
@@ -380,11 +381,11 @@ def src_04_reference_simulation(ep, scope_uid, test_mil, export_executions, resu
             
             # export to directory
             if export_executions:
-                mil_er_dir = os.path.join(result_dir, 'ER', 'MIL')
+                mil_er_dir = os.path.join(er_dir, 'MIL')
                 ep.post('execution-records-export', { 'UIDs' : mil_execution_records_uids, 'exportDirectory': mil_er_dir })
 
         if export_executions:
-            step_result['erDir'] = os.path.join(result_dir, model_name, 'ER')
+            step_result['erDir'] = er_dir
         step_result['status'] = 'PASSED'
     except Exception as e:
         handle_error(ep, step_result, error=e, step_start_time=start_time)
@@ -399,7 +400,7 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, sco
         clear_sl_cachefiles(os.path.dirname(model_path))
 
         # load BTC EmbeddedPlatform profile (*.epp) -> Update Model
-        ep.get(f'profiles/{epp_file}?discardCurrentProfile=true')
+        ep.get(f'profiles/{epp_file}?discardCurrentProfile=true', message="Migrating profile to " + ep.version)
 
         # check for interface changes (part 1)
         scope_uid = get_scope_uid(ep, scope_name)
@@ -799,7 +800,7 @@ def update_report(project_item=None, additional_stats={}):
 
 def initialize_report(models, title, filename, additional_stats={}):
     global report_json; report_json = os.path.abspath(os.path.join('results', 'report.json'))
-
+    os.makedirs(os.path.dirname(report_json), exist_ok=True)
     report_data = {
         'title' : title,
         'filename' : filename,
