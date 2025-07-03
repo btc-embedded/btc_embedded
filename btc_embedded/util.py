@@ -28,7 +28,7 @@ def run_matlab_function(ep, matlab_script_abs_path, args=[]):
     # add m-script's parent dir to matlab path
     script_dir, script_file = os.path.split(matlab_script_abs_path)
     script_name = script_file[:-2]
-    ep.post('execute-short-matlab-script',
+    ep.post('execute-long-matlab-script',
         {
             'scriptName' : 'addpath',
             'inArgs' : [ script_dir ]
