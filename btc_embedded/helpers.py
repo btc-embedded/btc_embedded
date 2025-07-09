@@ -38,7 +38,12 @@ def install_btc_config():
         for subkey_name in _get_subkeys(key):
             if subkey_name.startswith("EmbeddedPlatform"):
                 ep_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\BTC\{subkey_name}")
-                value_data, _ = winreg.QueryValueEx(ep_key, "EPACTIVE")
+                value_data = 0
+                try:
+                    value_data, _ = winreg.QueryValueEx(ep_key, "EPACTIVE")
+                except:
+                    #older versions do not contain the EPACTIVE key
+                    value_data = 0
                 if value_data == '1':
                     # version
                     match = re.search(VERSION_PATTERN_2, subkey_name)
