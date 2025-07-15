@@ -35,7 +35,7 @@ classifiers=[
         'Programming Language :: Python :: 3.13',
     ]
 [project.urls]
-Homepage = "https://github.com/pypa/sampleproject"
+Homepage = "https://github.com/btc-embedded/btc_embedded"
 
 [tool.setuptools]
 packages=["btc_embedded"]
