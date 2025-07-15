@@ -6,9 +6,12 @@ build-backend = "setuptools.build_meta"
 
 name = "btc_embedded"
 authors = [
-  {name = "Thabo Krick", email = "thabo.krick@btc-embedded.com"},]
+    {name = "Thabo Krick", email = "thabo.krick@btc-embedded.com"},
+    {name = "Nathan Drasovean", email = "nathan.drasovean@btc-embedded.com"},
+    {name = "Ferdinand Becker", email = "ferdinand.becker@btc-embedded.com"},
+]
 
-version = "25.1.3beta2"
+version = "25.2.1"
 
 license = "MIT"
 description="API wrapper for BTC EmbeddedPlatform REST API"
@@ -29,6 +32,7 @@ classifiers=[
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
     ]
 [project.urls]
 Homepage = "https://github.com/pypa/sampleproject"

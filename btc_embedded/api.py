@@ -72,7 +72,8 @@ class EPRestApi:
         self.ep_process = None
         self.config = None
         self.start_time = time.time()
-        self.message_marker_date=int(time.time() * 1000)
+        # default message marker date to 1 second before the start time (to be sure to include all following messages)
+        self._set_message_marker()
 
         #
         # Prepare configuration
@@ -385,15 +386,16 @@ class EPRestApi:
         """
         try:
             response = requests.get(self._url('/test'))
-            if response.ok and requested_version:
-                version = self.get('openapi.json')['info']['version']
-                if version != requested_version:
-                    old_port = self._PORT_
-                    new_port = str(int(old_port) + 1)
-                    print(f"Port {old_port} is already in use by an instance of BTC EmbeddedPlatform {version}. Trying port {new_port} for version {requested_version}...")
-                    self._PORT_ = new_port
-                else:
-                    return True
+            if response.ok:
+                if requested_version:
+                    version = self.get('openapi.json')['info']['version']
+                    if version != requested_version:
+                        old_port = self._PORT_
+                        new_port = str(int(old_port) + 1)
+                        print(f"Port {old_port} is already in use by an instance of BTC EmbeddedPlatform {version}. Trying port {new_port} for version {requested_version}...")
+                        self._PORT_ = new_port
+                        return False
+                return True
         except requests.exceptions.ConnectionError:
             pass
         return False
@@ -425,15 +427,16 @@ class EPRestApi:
             # if the error is none of the excluded messages -> print messages, etc.
             if all(msg not in response_content for msg in EXCLUDED_ERROR_MESSAGES):
                 self._handle_error(Exception(response_content), urlappendix, payload)
-        if response.status_code == 202:
-            jsonResponse = response.json()
-            for key, value in jsonResponse.items():
-                if key == 'jobID':
-                    while response.status_code == 202:
-                        time.sleep(2)
-                        print('.', end='')
-                        response = self._poll_long_running(value)
-                    print('')
+        try:
+            job_id = response.json()['jobID']
+            response = self._poll_long_running(job_id)
+            while response.status_code == 202:
+                time.sleep(2)
+                print('.', end='')
+                response = self._poll_long_running(job_id)
+            print('')
+        except:
+            pass
         return response
 
     def _poll_long_running(self, jobID):
@@ -447,7 +450,7 @@ class EPRestApi:
         if platform.system() == 'Windows':
             appdata_location = os.environ['APPDATA'].replace('\\', '/') + f"/BTC/ep/{version}/"
             self.log_file_path = os.path.join(appdata_location, self._PORT_, 'logs', 'current.log')
-        elif platform.system() == 'Linux':
+        else: #if platform.system() == 'Linux':
             log_dir = os.environ['LOG_DIR'] if 'LOG_DIR' in os.environ else '/tmp/ep/logs'
             self.log_file_path = os.path.join(log_dir, 'current.log')
 
@@ -520,7 +523,7 @@ class EPRestApi:
     
     def _precheck_post(self, urlappendix):
         """Sets the message marker date if the url appendix starts with 'profiles'."""
-        if urlappendix[:8] == 'profiles': self.message_marker_date = self.post('message-markers')['date']
+        if urlappendix[:8] == 'profiles': self._set_message_marker()
             
     def _precheck_get(self, urlappendix, message):
         """Prepares the URL appendix and sets the message marker date if the url appendix starts with 'profiles'."""
@@ -530,7 +533,7 @@ class EPRestApi:
         url_combined = urlappendix
         if urlappendix[:8] == 'profiles':
             # set/reset message marker
-            self.message_marker_date = self.post('message-markers')['date']
+            self._set_message_marker()
             # ensure profile is available and path is url-safe
             index_qmark = urlappendix.find('?')
             path = urlappendix[9:index_qmark] if index_qmark > 0 else urlappendix[9:]
@@ -785,6 +788,10 @@ class EPRestApi:
         if urlappendix[:8] == 'profiles':
             global the_watch_has_ended
             the_watch_has_ended = True
+
+    def _set_message_marker(self):
+        self.message_marker_date = int((time.time() + 1) * 1000)
+
 
 # if called directly, starts EP based on the global config
 if __name__ == '__main__':
