@@ -31,7 +31,8 @@ EXCLUDED_ERROR_MESSAGES = [
 ]
 EXCLUDED_LOG_MESSAGES = [
     'Registry key could not be read: The system cannot find the file specified',
-    'The compiler is already defined'
+    'The compiler is already defined',
+    'EpexCompilerServiceImpl - Compilation failed'
 ]
 
 class EPRestApi:
