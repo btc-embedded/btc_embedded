@@ -11,7 +11,7 @@ authors = [
     {name = "Ferdinand Becker", email = "ferdinand.becker@btc-embedded.com"},
 ]
 
-version = "25.2.2"
+version = "25.2.3"
 
 license = "MIT"
 description="API wrapper for BTC EmbeddedPlatform REST API"

@@ -437,7 +437,9 @@ class EPRestApi:
                 print('.', end='')
                 response = self._poll_long_running(job_id)
             print('')
-        except (requests.exceptions.JSONDecodeError, KeyError) as e:
+        except BtcApiException as e:
+            raise e
+        except Exception as e:
             pass
         return response
 
