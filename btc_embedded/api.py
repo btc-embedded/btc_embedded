@@ -30,7 +30,8 @@ EXCLUDED_ERROR_MESSAGES = [
     'No message found for the given query.'
 ]
 EXCLUDED_LOG_MESSAGES = [
-    'Registry key could not be read: The system cannot find the file specified'
+    'Registry key could not be read: The system cannot find the file specified',
+    'The compiler is already defined'
 ]
 
 class EPRestApi:
@@ -177,31 +178,32 @@ class EPRestApi:
         """
         # If _handle_error is already in the call stack, raise immediately to avoid recursion
         count = sum(1 for frame in inspect.stack() if frame.function == '_handle_error')
-        if count > 2: raise e
+        if count > 2: raise BtcApiException(e)
 
         # special handling for "resource not found -> give information about request"
         if (MSG_RESOURCE_NOT_FOUND in str(e)):
             print(f"\n\nYou requested a resource that doesn't exist: '{urlappendix}'\n\n")
-            raise e
+            raise BtcApiException(e)
         elif (MSG_BAD_REQUEST in str(e)):
             import json
             print(f"\n\nYou sent an invalid request to '{urlappendix}':\n{json.dumps(payload, indent=4)}\n\n")
-            raise e
+            raise BtcApiException(e)
         else:
-            print(f"\n\nEncountered error:\n{e}\n\n")
-        
+            print(f"\nEncountered error: {e}")
+        print('---------------------------------------')
         messages = self.get_messages()
         if messages:
-            print(f"\n\nMessages: \n\n")
+            print(f"\nMessages:")
             for msg in messages:
                 print(f"[{msg['date']}][{msg['severity']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
 
-        logged_errors = self.get_errors_from_log()
+        logged_errors = self.get_errors_from_log(self.start_time)
         if logged_errors:
-            print(f"\n\nErrors from log file\n{e}\n\n")
-            for entry in self.get_errors_from_log(self.start_time): print(entry.strip())
+            print(f"\nErrors from log file")
+            for entry in logged_errors: print(entry.strip())
 
-        raise e
+        print('---------------------------------------')
+        raise BtcApiException(e)
 
     def set_compiler(self, config=None, value=None):
         """
@@ -347,11 +349,11 @@ class EPRestApi:
         while not self._is_rest_service_available(version):
             if (time.time() - self.start_time) > timeout:
                 print(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
-                raise Exception("Application didn't respond within the defined timeout.")
+                raise BtcApiException("Application didn't respond within the defined timeout.")
             elif (not self._is_ep_process_still_alive()):
                 print(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")
                 self.print_log_entries()
-                raise Exception("Application failed to start.")
+                raise BtcApiException("Application failed to start.")
             time.sleep(2)
             print('.', end='')
 
@@ -435,7 +437,7 @@ class EPRestApi:
                 print('.', end='')
                 response = self._poll_long_running(job_id)
             print('')
-        except:
+        except (requests.exceptions.JSONDecodeError, KeyError) as e:
             pass
         return response
 
@@ -644,7 +646,7 @@ class EPRestApi:
     def _start_app_windows(self, version, install_location, port, license_location, lic, additional_vmargs):
         headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
         # check if we have what we need
-        if not (version and install_location): raise Exception("Cannot start BTC EmbeddedPlatform. Arguments version and install_location or install_root directory must be specified or configured in a config file (installationRoot)")
+        if not (version and install_location): raise BtcApiException("Cannot start BTC EmbeddedPlatform. Arguments version and install_location or install_root directory must be specified or configured in a config file (installationRoot)")
         # all good -> prepare start command for BTC EmbeddedPlatform
         appdata_location = os.environ['APPDATA'].replace('\\', '/') + f"/BTC/ep/{version}/"
         ml_port = 29300 + (port % 100)
@@ -657,10 +659,10 @@ class EPRestApi:
 -> either using the version and install_root parameters of the EPRestApi constructor
 -> or via the properties epVersion and installationRoot in the config file
 - The installation root directory is expected to contain the sub directory ep{version}.\n\n''')
-            raise Exception("EP Executable not found, cannot start BTC EmbeddedPlatform.")
+            raise BtcApiException("EP Executable not found, cannot start BTC EmbeddedPlatform.")
         if not self._is_rest_addon_installed(version):
             print(f'''\n\nThe REST API AddOn is not installed for BTC EmbeddedPlatform {version}\n\n''')
-            raise Exception("Addon not installed.")
+            raise BtcApiException("Addon not installed.")
         print(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
         args = f'"{install_location}"' + \
             ' -clearPersistedState' + \
@@ -749,12 +751,18 @@ class EPRestApi:
                     else:
                         # Continuation of the current log entry
                         if not current_entry == None:
-                            current_entry += line + "\n"
+                            current_entry += line
                 
                 # add last entry (if any)
                 if current_entry: log_entries.append(current_entry.strip())
 
-        return log_entries
+        cleaned_log_entries = []
+        for entry in log_entries:
+            entry_lines = entry.strip().split("\n")
+            # exclude stack trace lines and empty lines
+            entry_lines = [line.strip() for line in entry_lines if line.strip() and not line.strip().startswith('at ')]
+            cleaned_log_entries.append("\n    ".join(entry_lines))
+        return cleaned_log_entries
 
     def print_log_entries(self):
         for entry in self.get_errors_from_log(self.start_time): print(entry)
@@ -791,7 +799,11 @@ class EPRestApi:
 
     def _set_message_marker(self):
         self.message_marker_date = int((time.time() + 1) * 1000)
+        if not self.start_time: self.start_time = time.time()
 
+class BtcApiException(Exception):
+    """Custom exception for BTC EmbeddedPlatform API errors."""
+    pass
 
 # if called directly, starts EP based on the global config
 if __name__ == '__main__':
