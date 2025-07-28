@@ -11,7 +11,7 @@ authors = [
     {name = "Ferdinand Becker", email = "ferdinand.becker@btc-embedded.com"},
 ]
 
-version = "25.2.3"
+version = "25.2.3b1"
 
 license = "MIT"
 description="API wrapper for BTC EmbeddedPlatform REST API"
@@ -21,6 +21,7 @@ dependencies = [
     "pyyaml",
 ]
 
+readme = "README.md"
 
 classifiers=[
         'Development Status :: 5 - Production/Stable',
