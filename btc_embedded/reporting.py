@@ -1,3 +1,4 @@
+import logging
 import datetime
 import getpass
 import json
@@ -5,6 +6,8 @@ import os
 import re
 
 from btc_embedded.config import get_resource_path
+
+logger = logging.getLogger('BTC')
 
 
 def create_report_from_json(json_path):
