@@ -11,7 +11,7 @@ import yaml
 from btc_embedded.config import (BTC_CONFIG_DEFAULTLOCATION,
                                  BTC_CONFIG_ENVVAR_NAME, get_resource_path)
 
-logger = logging.getLogger('BTC')   
+logger = logging.getLogger('btc_embedded')
 
 VERSION_PATTERN_2 = r'(\d+\.\d+[a-zA-Z]\d+)' # e.g.   "24.3p1"
 KNOWN_FLOAT_TYPES = [ 'double', 'single', 'float', 'float32', 'float64', 'real' ]

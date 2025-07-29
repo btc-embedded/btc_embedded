@@ -6,7 +6,7 @@ from importlib import resources
 
 import yaml
 
-logger = logging.getLogger('BTC')
+logger = logging.getLogger('btc_embedded')
 
 BTC_CONFIG_ENVVAR_NAME = 'BTC_API_CONFIG_FILE'
 BTC_CONFIG_DEFAULTLOCATION = 'C:/ProgramData/BTC/ep/btc_config.yml'

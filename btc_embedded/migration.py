@@ -12,7 +12,7 @@ from btc_embedded.api import EPRestApi
 from btc_embedded.helpers import apply_tolerances_from_config
 from btc_embedded.reporting import create_report_from_json
 
-logger = logging.getLogger('BTC')
+logger = logging.getLogger('btc_embedded')
 
 message_report_file = None
 report_json = None

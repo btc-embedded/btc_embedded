@@ -6,8 +6,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from datetime import datetime
 
-logger = logging.getLogger('BTC')
-
+logger = logging.getLogger('btc_embedded')
 
 def run_matlab_script(ep, matlab_script_abs_path):
     """Evaluates the given script in the matlab base workspace:

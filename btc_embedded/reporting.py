@@ -7,8 +7,7 @@ import re
 
 from btc_embedded.config import get_resource_path
 
-logger = logging.getLogger('BTC')
-
+logger = logging.getLogger('btc_embedded')
 
 def create_report_from_json(json_path):
     target_dir = os.path.dirname(json_path)

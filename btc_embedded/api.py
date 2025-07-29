@@ -1,4 +1,5 @@
 # Configure logger
+import inspect
 import logging
 import inspect
 import os
@@ -20,8 +21,7 @@ from btc_embedded.config import (BTC_CONFIG_ENVVAR_NAME,
 from btc_embedded.helpers import (get_processes_by_name, install_btc_config,
                                   install_report_templates)
 
-logger = logging.getLogger('BTC')
-
+# Constants
 VERSION_PATTERN = r'ep(\d+\.\d+[a-zA-Z]\d+)' # e.g. "ep24.3p1"
 HEADERS = {'Accept': 'application/json, text/plain', 'Content-Type' : 'application/json'}
 DATE_FORMAT_MESSAGES = '%d-%b-%Y %H:%M:%S'
@@ -39,6 +39,12 @@ EXCLUDED_LOG_MESSAGES = [
     'EpexCompilerServiceImpl - Compilation failed'
 ]
 
+LOGGING_DISABLED = 1337
+
+logger = logging.getLogger('btc_embedded')
+
+
+
 class EPRestApi:
     #Starter for the EP executable
     def __init__(self,
@@ -53,7 +59,8 @@ class EPRestApi:
         additional_vmargs=[],
         timeout=120,
         skip_matlab_start=False,
-        skip_config_install=False):
+        skip_config_install=False,
+        log_level=logging.INFO):
         """
         Wrapper for the BTC EmbeddedPlatform REST API.
         When created without arguments, it uses the default install location & version defined in the global config (btc_config.yml).
@@ -70,7 +77,10 @@ class EPRestApi:
         - timeout (int): Timeout in seconds to start up BTC EmbeddedPlatform (default: 120).
         - skip_matlab_start (bool): Relevant in Docker-based use cases where Matlab is available but shall not be started (default: False).
         - skip_config_install (bool): Skips the automatic installation of a global btc_config.yml on your machine (default: False).
+        - log_level (int): The log level to use for the logger (default: logging.INFO).
         """
+
+        self.log_level = log_level
         self._PORT_ = "8080" if platform.system() == 'Linux' else str(port)
         self._HOST_ = host
         self.definitively_closed = False
@@ -80,6 +90,7 @@ class EPRestApi:
         self.start_time = time.time()
         # default message marker date to 1 second before the start time (to be sure to include all following messages)
         self._set_message_marker()
+        self._init_logging()
 
         #
         # Prepare configuration
@@ -117,7 +128,7 @@ class EPRestApi:
             logger.info(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
             self._connect_within_timeout(timeout, version)
             
-            logger.info('\nBTC EmbeddedPlatform has started.')
+            logger.info('BTC EmbeddedPlatform has started.')
         self._apply_preferences(version)
         self.version = version
         
@@ -301,7 +312,7 @@ class EPRestApi:
     # Performs a get request on the given url extension
     def get_req(self, urlappendix, message=None):
         """Public access to this method is DEPRICATED. Use get() instead, unless you want to get the raw http response"""
-        logger.warning("DEPRICATED: Use get() instead of get_req().")
+        #logger.warning("DEPRICATED: Use get() instead of get_req().")
         url = self._precheck_get(urlappendix, message)
         try:
             response = requests.get(self._url(url))
@@ -314,7 +325,7 @@ class EPRestApi:
     # Performs a delete request on the given url extension
     def delete_req(self, urlappendix, requestBody=None, message=None):
         """Public access to this method is DEPRICATED. Use delete() instead, unless you want to get the raw http response"""
-        logger.warning("DEPRICATED: Use delete() instead of delete_req().")
+        #logger.warning("DEPRICATED: Use delete() instead of delete_req().")
         if message: logger.info(message)
         try:
             if requestBody == None:
@@ -328,7 +339,7 @@ class EPRestApi:
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
     def post_req(self, urlappendix, requestBody=None, message=None):
         """Public access to this method is DEPRICATED. Use post() instead, unless you want to get the raw http response"""
-        logger.warning("DEPRICATED: Use post() instead of post_req().")
+        #logger.warning("DEPRICATED: Use post() instead of post_req().")
         self._precheck_post(urlappendix)
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
         
@@ -345,7 +356,7 @@ class EPRestApi:
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
     def put_req(self, urlappendix, requestBody=None, message=None):
         """Public access to this method is DEPRICATED. Use put() instead, unless you want to get the raw http response"""
-        logger.warning("DEPRICATED: Use put() instead of put_req().")
+        #logger.warning("DEPRICATED: Use put() instead of put_req().")
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
         if message: logger.info(message)
         try:
@@ -800,6 +811,15 @@ class EPRestApi:
 
     def print_log_entries(self):
         for entry in self.get_errors_from_log(self.start_time): logger.error(entry)
+
+    def _init_logging(self):
+        logger.setLevel(self.log_level)
+        # if logging is not disabled and there are no handlers -> add console handler
+        if not self.log_level == LOGGING_DISABLED and not logger.hasHandlers():
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.DEBUG)
+            console_handler.setFormatter(logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+            logger.addHandler(console_handler)
 
     def _watch_profile_migration(self):
         """Can be called (async) to report the status of a profile migration."""

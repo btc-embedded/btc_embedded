@@ -1,68 +1,14 @@
-
 import logging
+import os
 
-
-
-
-
-from btc_embedded import EPRestApi
-
-
-
-
+from btc_embedded import LOGGING_DISABLED, EPRestApi
 
 # Configure logger
+logger = logging.getLogger('btc_embedded')
+log_file = os.path.join(os.path.dirname(__file__), 'btc_embedded.log')
+file_handler = logging.FileHandler(log_file)
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+logger.addHandler(file_handler)
 
-
-logger = logging.getLogger('BTC')
-
-
-logger.setLevel(logging.DEBUG)
-
-
-
-
-
-# Create console handler and set level to debug
-
-
-ch = logging.StreamHandler()
-
-
-ch.setLevel(logging.DEBUG)
-
-
-
-
-
-# Create formatter
-
-
-#formatter = logging.Formatter('[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
-
-formatter = logging.Formatter('[%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
-
-
-
-
-# Add formatter to console handler
-
-
-ch.setFormatter(formatter)
-
-
-
-
-
-# Add console handler to logger
-
-
-logger.addHandler(ch)
-
-
-
-
-
-ep = EPRestApi()
+ep = EPRestApi(log_level=LOGGING_DISABLED)
