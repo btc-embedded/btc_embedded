@@ -19,7 +19,7 @@ from btc_embedded.config import (BTC_CONFIG_ENVVAR_NAME,
                                  get_config_path_from_resources,
                                  get_global_config)
 from btc_embedded.helpers import (get_processes_by_name, install_btc_config,
-                                  install_report_templates)
+                                  install_report_templates,is_port_in_use)
 
 # Constants
 VERSION_PATTERN = r'ep(\d+\.\d+[a-zA-Z]\d+)' # e.g. "ep24.3p1"
@@ -60,7 +60,8 @@ class EPRestApi:
         timeout=120,
         skip_matlab_start=False,
         skip_config_install=False,
-        log_level=logging.INFO):
+        log_level=logging.INFO,
+        force_new_port=False):
         """
         Wrapper for the BTC EmbeddedPlatform REST API.
         When created without arguments, it uses the default install location & version defined in the global config (btc_config.yml).
@@ -78,6 +79,7 @@ class EPRestApi:
         - skip_matlab_start (bool): Relevant in Docker-based use cases where Matlab is available but shall not be started (default: False).
         - skip_config_install (bool): Skips the automatic installation of a global btc_config.yml on your machine (default: False).
         - log_level (int): The log level to use for the logger (default: logging.INFO).
+        - force_new_port (bool): If true will not connect to running instance of EP and instead search for open port. Increments from provided port. (default: False)
         """
 
         self.log_level = log_level
@@ -88,10 +90,15 @@ class EPRestApi:
         self.ep_process = None
         self.config = None
         self.start_time = time.time()
+        self.force_new_port = force_new_port
         # default message marker date to 1 second before the start time (to be sure to include all following messages)
         self._set_message_marker()
         self._init_logging()
 
+        #Search for open port if enabled
+        if self.force_new_port:
+            host_no_protocol = self._HOST_.replace("http://","").replace("https://","")
+            self._PORT_ = str(self._find_next_port(int(self._PORT_), host_no_protocol))
         #
         # Prepare configuration
         #
@@ -165,7 +172,7 @@ class EPRestApi:
         """Returns the result object, or the response, if no result object is available."""
         response = self.post_req(urlappendix, requestBody, message)
         return self._extract_result(response)
-    
+
     # wrapper directly returns the relevant object if possible
     def put(self, urlappendix, requestBody=None, message=None):
         """Returns the result object, or the response, if no result object is available."""
@@ -400,7 +407,7 @@ class EPRestApi:
             time.sleep(2)
             #print('.', end='')
 
-
+    
     # extracts the response object which can be nested in different ways
     def _extract_result(self, response):
         """If the response object contains data, it is accessed via .json().
@@ -854,6 +861,26 @@ class EPRestApi:
     def _set_message_marker(self):
         self.message_marker_date = int((time.time() + 1) * 1000)
         if not self.start_time: self.start_time = time.time()
+    
+    def _find_next_port(self, initial_port: int, host):
+        open_port = initial_port
+
+        try:
+            port_found = not is_port_in_use(open_port, host)
+        except:
+            logger.error(f"Error searching for open ports on {host}. Continuing with default port of {initial_port}.")
+            return initial_port
+        while open_port <= 65535 and not port_found:
+            logger.debug(f"Port {open_port} busy. Trying port {open_port+1}.")
+            open_port += 1
+            port_found = not is_port_in_use(open_port,host)
+        
+        if open_port > 65535:
+            logger.error(f"All ports greater than {initial_port} searched. No open port found. Please provide the specific port to connect to.")
+            raise BtcApiException("No open port found.")
+        return open_port
+
+        
 
 class BtcApiException(Exception):
     """Custom exception for BTC EmbeddedPlatform API errors."""

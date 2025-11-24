@@ -10,6 +10,8 @@ import yaml
 
 from btc_embedded.config import (BTC_CONFIG_DEFAULTLOCATION,
                                  BTC_CONFIG_ENVVAR_NAME, get_resource_path)
+import socket
+
 
 logger = logging.getLogger('btc_embedded')
 
@@ -315,4 +317,8 @@ def get_processes_by_name(name):
         return [(p["Name"], p["Path"]) for p in (data if isinstance(data, list) else [data])]
     except json.JSONDecodeError:
         return []
+
+def is_port_in_use(port: int, host) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex((host, port)) == 0 #can raise an exception in case of bad host name
 
