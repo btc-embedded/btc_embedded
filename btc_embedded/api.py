@@ -871,7 +871,7 @@ class EPRestApi:
             logger.error(f"Error searching for open ports on {host}. Continuing with default port of {initial_port}.")
             return initial_port
         while open_port <= 65535 and not port_found:
-            logger.info(f"Port {open_port} busy. Trying port {open_port+1}.")
+            logger.debug(f"Port {open_port} busy. Trying port {open_port+1}.")
             open_port += 1
             port_found = not is_port_in_use(open_port,host)
         
