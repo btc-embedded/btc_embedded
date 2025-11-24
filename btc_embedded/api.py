@@ -875,8 +875,9 @@ class EPRestApi:
             open_port += 1
             port_found = not is_port_in_use(open_port,host)
         
-        if open_port == 65535:
+        if open_port > 65535:
             logger.error(f"All ports greater than {initial_port} searched. No open port found. Please provide the specific port to connect to.")
+            raise BtcApiException("No open port found.")
         return open_port
 
         
