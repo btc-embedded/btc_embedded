@@ -5,15 +5,18 @@ from datetime import datetime
 from btc_embedded import EPRestApi, util
 
 
-def run_btc_tests(epp_file):
-    epp_file = os.path.abspath(epp_file)
+def run_btc_tests():
+    epp_file = os.path.abspath('test/test.epp')
     project_name = os.path.basename(epp_file)[:-4]
     work_dir = os.path.dirname(epp_file)
     # BTC EmbeddedPlatform API object
     ep = EPRestApi()
 
     # Load a BTC EmbeddedPlatform profile (*.epp) and update it
-    ep.get(f'profiles/{epp_file}?discardCurrentProfile=true', message="Loading test project")
+    ep.get(f'profiles/{epp_file}', message="Loading test project (old API)")
+    # ep.get(f'openprofile?path={epp_file}', message="Loading test project (new API)")
+    ep.put('profiles', { 'path': epp_file }, message="Saving test project")
+    exit()
     ep.put('architectures?performUpdateCheck=true', message="Updating test project")
 
     start_time = datetime.now()
@@ -62,4 +65,4 @@ def run_btc_tests(epp_file):
 
 
 if __name__ == '__main__':
-    run_btc_tests(sys.argv[1])
+    run_btc_tests()

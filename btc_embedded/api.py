@@ -1,7 +1,6 @@
 # Configure logger
 import inspect
 import logging
-import inspect
 import os
 import platform
 import re
@@ -19,7 +18,7 @@ from btc_embedded.config import (BTC_CONFIG_ENVVAR_NAME,
                                  get_config_path_from_resources,
                                  get_global_config)
 from btc_embedded.helpers import (get_processes_by_name, install_btc_config,
-                                  install_report_templates,is_port_in_use)
+                                  install_report_templates, is_port_in_use)
 
 # Constants
 VERSION_PATTERN = r'ep(\d+\.\d+[a-zA-Z]\d+)' # e.g. "ep24.3p1"
@@ -147,6 +146,7 @@ class EPRestApi:
     # closes the application
     def close_application(self):
         """Closes the BTC EmbeddedPlatform application"""
+        logger.info(f'Closing BTC EmbeddedPlatform {self.version}...')
         self.delete('application?force-quit=true')
         start_time = time.time()
         if self.ep_process:
@@ -160,6 +160,7 @@ class EPRestApi:
                 else:
                     time.sleep(2)
             self.definitively_closed = True
+        logger.info('BTC EmbeddedPlatform has been closed.')
 
     # wrapper directly returns the relevant object if possible
     def get(self, urlappendix, message=None):
@@ -234,7 +235,6 @@ class EPRestApi:
         if messages:
             logger.info(f"\n\nMessages: \n\n")
             for msg in messages:
-
                 log_level = self._get_loglevel(msg['severity'])                
                 logger.log(level=log_level, msg=f"[{msg['date']}] {msg['message']}" + (f" (Hint: {msg['hint']})" if 'hint' in msg and msg['hint'] else ""))
         
@@ -495,7 +495,7 @@ class EPRestApi:
 
     def _poll_long_running(self, jobID):
         # before 21.3, the jobID was appended to the URL, after 21.3 it is passed as a query parameter
-        if self.version < '21.3p0':
+        if self.version and self.version < '21.3p0':
             return self.get_req('/progress/' + jobID)
         else:
             return self.get_req('/progress?progress-id=' + jobID)
@@ -586,23 +586,67 @@ class EPRestApi:
             # print this unless it's a progress query (to avoid flooding the console)
             if message: logger.info(message)
         url_combined = urlappendix
-        if urlappendix[:8] == 'profiles':
+        if self._is_profile_load_call(urlappendix):
             # set/reset message marker
             self._set_message_marker()
             # ensure profile is available and path is url-safe
-            index_qmark = urlappendix.find('?')
-            path = urlappendix[9:index_qmark] if index_qmark > 0 else urlappendix[9:]
-            suffix = urlappendix[index_qmark:] if index_qmark > 0 else ""
-            path = unquote(path) # unquote incase caller already quoted the path
-            if path and not os.path.isfile(path) and self._is_localhost():
-                logger.critical(f"\nThe profile '{path}' cannot be found. Please ensure that the file is available.\n")
-                exit(1)
-            path = quote(path, safe="")
-            url_combined = 'profiles/' + path + suffix
+            if urlappendix.startswith('openprofile'):
+                url_combined = self._get_profilesurl_post253(urlappendix, logger)
+            else:
+                if self.version and self.version >= '25.3p0':
+                    logger.warning("Loading profiles via 'profiles/...' endpoint is deprecated since BTC EmbeddedPlatform 25.3p0. Please use 'openprofile?path=...' instead.")
+                    url_combined = self._get_profilesurl_pre253(urlappendix, logger, convert_to_post253=True)
+                else:
+                    url_combined = self._get_profilesurl_pre253(urlappendix, logger)
+                
             # watch profile migration status
             threading.Thread(target=self._watch_profile_migration, daemon=True).start()
-        
         return url_combined
+
+    def _is_profile_load_call(self, urlappendix):
+        return urlappendix.startswith('openprofile') or urlappendix.startswith('profiles/')
+
+    def _get_profilesurl_post253(self, urlappendix, logger):
+        index_qmark = urlappendix.find('?')
+        query_params_string = urlappendix[index_qmark+1:] if index_qmark > 0 else ""
+        if query_params_string:
+            query_param_pairs = query_params_string.split('&')
+            for qpp in query_param_pairs:
+                key, value = qpp.split('=')
+                if key == 'path':
+                    path = unquote(value) # unquote incase caller already quoted the path
+                    if path and not os.path.isfile(path) and self._is_localhost():
+                        logger.critical(f"\nThe profile '{path}' cannot be found. Please ensure that the file is available.\n")
+                        exit(1)
+                    path = quote(path, safe="")
+                    break
+            if path:
+                # reconstruct query params string
+                new_query_params = []
+                for qpp2 in query_param_pairs:
+                    key2, _ = qpp2.split('=')
+                    if key2 == 'path':
+                        new_query_params.append(f"{key2}={path}")
+                    else:
+                        new_query_params.append(qpp2)
+                query_params_string = '&'.join(new_query_params)
+            return 'openprofile?' + query_params_string
+        raise Exception("Missing 'path' query parameter in openprofile request.")
+
+    # profiles/C:/foo.epp?discardCurrentProfile=true
+    def _get_profilesurl_pre253(self, urlappendix, logger, convert_to_post253=False):
+        index_qmark = urlappendix.find('?')
+        path = urlappendix[9:index_qmark] if index_qmark > 0 else urlappendix[9:]
+        suffix = urlappendix[index_qmark:] if index_qmark > 0 else ""
+        path = unquote(path) # unquote incase caller already quoted the path
+        if path and not os.path.isfile(path) and self._is_localhost():
+            logger.critical(f"\nThe profile '{path}' cannot be found. Please ensure that the file is available.\n")
+            exit(1)
+        path = quote(path, safe="")
+        if convert_to_post253:
+            return 'openprofile?path=' + path + suffix
+        else:   
+            return 'profiles/' + path + suffix
 
     def _is_rest_addon_installed(self, version):
         """
@@ -697,7 +741,7 @@ class EPRestApi:
         return version
 
     def _start_app_windows(self, version, install_location, port, license_location, lic, additional_vmargs):
-        headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
+        headless_application_id = 'ep.application.headless' if str(version) < '23.3p0' else 'ep.application.headless.HeadlessApplication'
         # check if we have what we need
         if not (version and install_location): raise BtcApiException("Cannot start BTC EmbeddedPlatform. Arguments version and install_location or install_root directory must be specified or configured in a config file (installationRoot)")
         # all good -> prepare start command for BTC EmbeddedPlatform
