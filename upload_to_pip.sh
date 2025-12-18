@@ -2,6 +2,7 @@
 rm -rf build dist btc_embedded.egg-info
 
 # build distributable package
+pip install build
 python3 -m build
 
 # upload to public repo using token from keychain

@@ -20,6 +20,7 @@
 !*.ps1
 !*.toml
 !public/*.png
+!public/*.svg
 .idea/
 .pypirc
 build/

@@ -4,6 +4,7 @@ Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force btc_embedded.egg-info -ErrorAction SilentlyContinue
 
 # build distributable package
+pip install build
 python -m build
 
 # upload to public repo using token prompted on command line
