@@ -644,7 +644,7 @@ class EPRestApi:
             exit(1)
         path = quote(path, safe="")
         if convert_to_post253:
-            return 'openprofile?path=' + path + suffix
+            return 'openprofile?path=' + path
         else:   
             return 'profiles/' + path + suffix
 
