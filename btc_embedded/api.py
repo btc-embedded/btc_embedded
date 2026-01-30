@@ -163,32 +163,32 @@ class EPRestApi:
         logger.info('BTC EmbeddedPlatform has been closed.')
 
     # wrapper directly returns the relevant object if possible
-    def get(self, urlappendix, message=None):
+    def get(self, urlappendix, message=None, timeout=None):
         """Returns the result object, or the response, if no result object is available."""
         response = self.get_req(urlappendix, message)
         return self._extract_result(response)
     
     # wrapper directly returns the relevant object if possible
-    def post(self, urlappendix, requestBody=None, message=None):
+    def post(self, urlappendix, requestBody=None, message=None, timeout=None):
         """Returns the result object, or the response, if no result object is available."""
-        response = self.post_req(urlappendix, requestBody, message)
+        response = self.post_req(urlappendix, requestBody, message, timeout)
         return self._extract_result(response)
 
     # wrapper directly returns the relevant object if possible
-    def put(self, urlappendix, requestBody=None, message=None):
+    def put(self, urlappendix, requestBody=None, message=None, timeout=None):
         """Returns the result object, or the response, if no result object is available."""
-        response = self.put_req(urlappendix, requestBody, message)
+        response = self.put_req(urlappendix, requestBody, message, timeout)
         return self._extract_result(response)
     
-    def patch(self, urlappendix, requestBody=None, message=None):
+    def patch(self, urlappendix, requestBody=None, message=None, timeout=None):
         """Returns the result object, or the response, if no result object is available."""
-        response = self.patch_req(urlappendix, requestBody, message)
+        response = self.patch_req(urlappendix, requestBody, message, timeout)
         return self._extract_result(response)
     
     # wrapper directly returns the relevant object if possible
-    def delete(self, urlappendix, requestBody=None, message=None):
+    def delete(self, urlappendix, requestBody=None, message=None, timeout=None):
         """Performs a delete request and returns the response object"""
-        return self.delete_req(urlappendix, requestBody, message)
+        return self.delete_req(urlappendix, requestBody, message, timeout)
 
 
     def _get_loglevel(self, severity):
@@ -317,7 +317,7 @@ class EPRestApi:
     # - - - - - - - - - - - - - - - - - - - - 
 
     # Performs a get request on the given url extension
-    def get_req(self, urlappendix, message=None):
+    def get_req(self, urlappendix, message=None, timeout=None):
         """Public access to this method is DEPRICATED. Use get() instead, unless you want to get the raw http response"""
         #logger.warning("DEPRICATED: Use get() instead of get_req().")
         url = self._precheck_get(urlappendix, message)
@@ -327,10 +327,10 @@ class EPRestApi:
             self._handle_error(e, urlappendix)
         finally:
             self._the_watch_has_ended(urlappendix)
-        return self._check_long_running(response, urlappendix)
+        return self._check_long_running(response, urlappendix,timeout)
     
     # Performs a delete request on the given url extension
-    def delete_req(self, urlappendix, requestBody=None, message=None):
+    def delete_req(self, urlappendix, requestBody=None, message=None, timeout=None):
         """Public access to this method is DEPRICATED. Use delete() instead, unless you want to get the raw http response"""
         #logger.warning("DEPRICATED: Use delete() instead of delete_req().")
         if message: logger.info(message)
@@ -341,10 +341,10 @@ class EPRestApi:
                 response = requests.delete(self._url(urlappendix), json=requestBody, headers=HEADERS)
         except Exception as e:
             self._handle_error(e, urlappendix, requestBody)
-        return self._check_long_running(response, urlappendix, requestBody)
+        return self._check_long_running(response, urlappendix, requestBody, timeout)
 
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
-    def post_req(self, urlappendix, requestBody=None, message=None):
+    def post_req(self, urlappendix, requestBody=None, message=None, timeout=None):
         """Public access to this method is DEPRICATED. Use post() instead, unless you want to get the raw http response"""
         #logger.warning("DEPRICATED: Use post() instead of post_req().")
         self._precheck_post(urlappendix)
@@ -358,10 +358,10 @@ class EPRestApi:
                 response = requests.post(self._url(url), json=requestBody, headers=HEADERS)
         except Exception as e:
             self._handle_error(e, urlappendix, requestBody)
-        return self._check_long_running(response, urlappendix, requestBody)
+        return self._check_long_running(response, urlappendix, requestBody, timeout)
 
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
-    def put_req(self, urlappendix, requestBody=None, message=None):
+    def put_req(self, urlappendix, requestBody=None, message=None, timeout=None):
         """Public access to this method is DEPRICATED. Use put() instead, unless you want to get the raw http response"""
         #logger.warning("DEPRICATED: Use put() instead of put_req().")
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
@@ -374,12 +374,12 @@ class EPRestApi:
         except Exception as e:
             self._handle_error(e, urlappendix, requestBody)
         
-        finalResponse = self._check_long_running(response, urlappendix, requestBody)
+        finalResponse = self._check_long_running(response, urlappendix, requestBody, timeout)
         self._postcheck_put(urlappendix,finalResponse)
         return finalResponse
     
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
-    def patch_req(self, urlappendix, requestBody=None, message=None):
+    def patch_req(self, urlappendix, requestBody=None, message=None, timeout=None):
         """Public access to this method is DEPRICATED. Use patch() instead, unless you want to get the raw http response"""
         url = urlappendix.replace('\\', '/').replace(' ', '%20')
         if message: logger.info(message)
@@ -390,7 +390,7 @@ class EPRestApi:
                 response = requests.patch(self._url(url), json=requestBody, headers=HEADERS)
         except Exception as e:
             self._handle_error(e, urlappendix, requestBody)
-        return self._check_long_running(response, urlappendix, requestBody)
+        return self._check_long_running(response, urlappendix, requestBody, timeout)
 
 
     # - - - - - - - - - - - - - - - - - - - - 
@@ -460,12 +460,13 @@ class EPRestApi:
         return f"{self._HOST_}:{self._PORT_}/ep/{path.lstrip('/')}".replace('/ep/ep/', '/ep/')
 
     # This method is used to poll a request until the progress is done.
-    def _check_long_running(self, response, urlappendix, payload=None):
+    def _check_long_running(self, response, urlappendix, payload=None, timeout=None):
         """
         Checks the status of a long-running operation and handles errors.
 
         Args:
             response (requests.Response): The initial response object to check.
+            timeout: timeout in seconds
 
         Returns:
             requests.Response: The final response object after the long-running operation completes.
@@ -477,6 +478,14 @@ class EPRestApi:
             - If the response is not OK and contains an error message not in the excluded list, it prints the error message, calls `self.print_messages()`, and raises an Exception.
             - If the response status code is 202 (Accepted), it polls the long-running operation using the job ID until the status code is no longer 202.
         """
+
+        start_time = time.time()
+        cancelled = False
+
+        if not timeout is None and self.version < '25.3p0':
+            logger.warning("Cancellation of long running tasks was added in EP25.3p0. Timeout will not be considered.")
+            timeout = None
+
         if not response.ok:
             response_content = response.content.decode('utf-8')
             # if the error is none of the excluded messages -> print messages, etc.
@@ -487,9 +496,14 @@ class EPRestApi:
             response = self._poll_long_running(job_id)
             while response.status_code == 202:
                 time.sleep(2)
-                #print('.', end='')
                 response = self._poll_long_running(job_id)
-            #print('')
+                if not timeout is None and time.time()-start_time > timeout and not cancelled:
+                    try:
+                        self.get_req("progress/cancel",{"progress-id":job_id})
+                        logger.info(f"Cancelling long running task: {urlappendix}")
+                        cancelled = True
+                    except:
+                        logger.warning("Error cancelling long running task. Possibly the task is already completed")
         except BtcApiException as e:
             raise e
         except Exception as e:
