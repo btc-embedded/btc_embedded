@@ -373,7 +373,10 @@ class EPRestApi:
                 response = requests.put(self._url(url), json=requestBody, headers=HEADERS)
         except Exception as e:
             self._handle_error(e, urlappendix, requestBody)
-        return self._check_long_running(response, urlappendix, requestBody, timeout)
+        
+        finalResponse = self._check_long_running(response, urlappendix, requestBody, timeout)
+        self._postcheck_put(urlappendix,finalResponse)
+        return finalResponse
     
     # Performs a post request on the given url extension. The optional requestBody contains the information necessary for the request
     def patch_req(self, urlappendix, requestBody=None, message=None, timeout=None):
@@ -593,6 +596,16 @@ class EPRestApi:
     def _precheck_post(self, urlappendix):
         """Sets the message marker date if the url appendix starts with 'profiles'."""
         if urlappendix[:8] == 'profiles': self._set_message_marker()
+    
+    def _postcheck_put(self,urlappendix,response):
+        if urlappendix == 'architectures?performUpdateCheck=true' : self._post_update_compiler_check(response)
+    
+
+    def _post_update_compiler_check(self,reponse):
+        """Sets the compiler to config value if no architecture update was performed"""
+        if reponse.status_code == 204:
+            logger.info("Architecture update was skipped. Setting profile compiler to avoid potential SiL errors. May lead to a different compiler being used than configured MEX compiler.")
+            self.set_compiler()
             
     def _precheck_get(self, urlappendix, message):
         """Prepares the URL appendix and sets the message marker date if the url appendix starts with 'profiles'."""
