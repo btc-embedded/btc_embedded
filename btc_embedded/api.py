@@ -956,6 +956,9 @@ class EPRestApi:
         """
         Gets all ports used by EP REST instances, including currently starting EP instances.
         """
+        if platform.system() == 'Linux':
+            return []
+
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         startupinfo.wShowWindow = subprocess.SW_HIDE
