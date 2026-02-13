@@ -935,21 +935,47 @@ class EPRestApi:
     
     def _find_next_port(self, initial_port: int, host):
         open_port = initial_port
-
+        ep_ports = self._get_ep_ports()
         try:
-            port_found = not is_port_in_use(open_port, host)
+            port_found = not is_port_in_use(open_port, host) and not str(open_port) in ep_ports
         except:
             logger.error(f"Error searching for open ports on {host}. Continuing with default port of {initial_port}.")
             return initial_port
         while open_port <= 65535 and not port_found:
             logger.debug(f"Port {open_port} busy. Trying port {open_port+1}.")
             open_port += 1
-            port_found = not is_port_in_use(open_port,host)
+            port_found = not is_port_in_use(open_port,host) and not str(open_port) in ep_ports
         
         if open_port > 65535:
             logger.error(f"All ports greater than {initial_port} searched. No open port found. Please provide the specific port to connect to.")
             raise BtcApiException("No open port found.")
         return open_port
+    
+    
+    def _get_ep_ports(self):
+        """
+        Gets all ports used by EP REST instances, including currently starting EP instances.
+        """
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        try:
+            javawPIDs = subprocess.check_output(['powershell',' -command', 'Get-Process javaw | Select -expand id'],startupinfo=startupinfo).decode("utf-8").split(os.linesep)[:-1]
+        except:
+            return []
+
+        restPorts = []
+        for pid in javawPIDs:
+            vmProperties = []
+            try:
+                vmProperties = subprocess.check_output(['jcmd',pid, 'VM.system_properties'],startupinfo=startupinfo).decode("utf-8").split(os.linesep)
+            except:
+                pass
+            restPort = [vmProp.split('=')[1] for vmProp in vmProperties if vmProp.startswith("ep.rest.port")]
+            if len(restPort) > 0:
+                restPorts.append(restPort[0])
+
+        return restPorts
 
         
 
