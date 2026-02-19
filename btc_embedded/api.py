@@ -94,49 +94,59 @@ class EPRestApi:
         self._set_message_marker()
         self._init_logging()
 
+        self.reservePortRegLock()
+        portInfos = self.startPortReg()
         #Search for open port if enabled
-        if self.force_new_port:
-            host_no_protocol = self._HOST_.replace("http://","").replace("https://","")
-            self._PORT_ = str(self._find_next_port(int(self._PORT_), host_no_protocol))
-        #
-        # Prepare configuration
-        #
-        if config: self.config = config
-        else: # default to global config
-            if platform.system() == 'Windows' and self._is_localhost() and not skip_config_install:
-                install_btc_config()
-            self.config = get_global_config()
-        # apply timeout from config if specified
-        if 'startupTimeout' in self.config: timeout = self.config['startupTimeout']
-        # set install location based on install_root and version if set explicitly
-        if version and install_root and not install_location: install_location = f"{install_root}/ep{version}"
-        if install_location and not version:
-            match = re.search(VERSION_PATTERN, install_location)
-            if match: version = match.group(1)
-        # fallback: determine based on config
-        if not (version and install_location) and 'installationRoot' in self.config and (version or 'epVersion' in self.config):
-            version = version or self.config['epVersion']
-            install_location = f"{self.config['installationRoot']}/ep{version}"
-        self._set_log_file_location(version)
+        try:
+            if self.force_new_port:
+                host_no_protocol = self._HOST_.replace("http://","").replace("https://","")
+                self._PORT_ = str(self._find_next_port(int(self._PORT_), host_no_protocol,portInfos))
+            
 
-        #
-        # Start / Connect to the BTC EmbeddedPlatform
-        #
-        if self._is_rest_service_available(version):
-            # connect to a running application
-            version = self.get('openapi.json')['info']['version']
-            logger.info(f'Connected to BTC EmbeddedPlatform {version} at {host}:{self._PORT_}')
-        else:
-            # start the application
-            if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, additional_vmargs)
-            elif platform.system() == 'Linux': version = self._start_app_linux(license_location, lic, skip_matlab_start, additional_vmargs)
-            
-            logger.info(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
-            self._connect_within_timeout(timeout, version)
-            
-            logger.info('BTC EmbeddedPlatform has started.')
-        self._apply_preferences(version)
-        self.version = version
+            #
+            # Prepare configuration
+            #
+            if config: self.config = config
+            else: # default to global config
+                if platform.system() == 'Windows' and self._is_localhost() and not skip_config_install:
+                    install_btc_config()
+                self.config = get_global_config()
+            # apply timeout from config if specified
+            if 'startupTimeout' in self.config: timeout = self.config['startupTimeout']
+            # set install location based on install_root and version if set explicitly
+            if version and install_root and not install_location: install_location = f"{install_root}/ep{version}"
+            if install_location and not version:
+                match = re.search(VERSION_PATTERN, install_location)
+                if match: version = match.group(1)
+            # fallback: determine based on config
+            if not (version and install_location) and 'installationRoot' in self.config and (version or 'epVersion' in self.config):
+                version = version or self.config['epVersion']
+                install_location = f"{self.config['installationRoot']}/ep{version}"
+            self._set_log_file_location(version)
+
+            #
+            # Start / Connect to the BTC EmbeddedPlatform
+            #
+            if self._is_rest_service_available(version):
+                self.clearPortRegLock()
+                # connect to a running application
+                version = self.get('openapi.json')['info']['version']
+                logger.info(f'Connected to BTC EmbeddedPlatform {version} at {host}:{self._PORT_}')            
+            else:
+                # start the application
+                if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, additional_vmargs)
+                elif platform.system() == 'Linux': version = self._start_app_linux(license_location, lic, skip_matlab_start, additional_vmargs)
+
+                
+                logger.info(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
+                self._connect_within_timeout(timeout, version)
+                
+                logger.info('BTC EmbeddedPlatform has started.')
+            self._apply_preferences(version)
+            self.version = version
+        except Exception:
+            self.clearPortRegLock()
+            raise(Exception)
         
 
     # - - - - - - - - - - - - - - - - - - - - 
@@ -805,6 +815,10 @@ class EPRestApi:
         if additional_vmargs:
             args += " " + " ".join(additional_vmargs)
         self.ep_process = subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+
+        self.appendPortReg(self.ep_process.pid, self._PORT_)
+        self.clearPortRegLock()
+
         self.actively_started = True
 
     def _does_api_support_signalinfo(self):
@@ -933,25 +947,90 @@ class EPRestApi:
         self.message_marker_date = int((time.time() + 1) * 1000)
         if not self.start_time: self.start_time = time.time()
     
-    def _find_next_port(self, initial_port: int, host):
+    def _find_next_port(self, initial_port: int, host,portInfos):
         open_port = initial_port
-
+        ep_ports = [portInfo[1] for portInfo in portInfos]
         try:
-            port_found = not is_port_in_use(open_port, host)
+            port_found = not is_port_in_use(open_port, host) and str(open_port) not in ep_ports
         except:
             logger.error(f"Error searching for open ports on {host}. Continuing with default port of {initial_port}.")
             return initial_port
         while open_port <= 65535 and not port_found:
             logger.debug(f"Port {open_port} busy. Trying port {open_port+1}.")
             open_port += 1
-            port_found = not is_port_in_use(open_port,host)
+            port_found = not is_port_in_use(open_port,host) and str(open_port) not in ep_ports
         
         if open_port > 65535:
             logger.error(f"All ports greater than {initial_port} searched. No open port found. Please provide the specific port to connect to.")
             raise BtcApiException("No open port found.")
         return open_port
 
-        
+    def reservePortRegLock(self):
+        lockLocation = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.lock"
+        print("bb")
+        while os.path.isfile(lockLocation):
+            print(time.time() - os.path.getmtime(lockLocation))
+            try:
+                if time.time() - os.path.getmtime(lockLocation) > 30:
+                    os.remove(lockLocation)
+            except:
+                pass
+            time.sleep(0.5)
+        try:
+            with open(lockLocation,"w") as f:
+                return True
+        except:
+            return False
+
+    def clearPortRegLock(self):
+        lockLocation = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.lock"
+        if os.path.isfile(lockLocation):
+            os.remove(lockLocation)
+    
+
+    def readPortReg(self):
+        import csv
+        portInfos = []
+        portReg  = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.csv"
+        with open(portReg,"r") as f:
+            regReader = csv.reader(f)
+            for row in regReader:
+                if not row == []:
+                    portInfos.append(row)
+        return portInfos
+    
+    def removeOutdatedRegs(self,portInfos):
+        import csv
+
+        portReg  = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.csv"
+
+        runningProcesses = subprocess.check_output('tasklist').decode().replace(" ","")
+        updatedRegistrations = [[reg[0],reg[1]] for reg in portInfos if "ep.exe"+reg[0] in runningProcesses]
+
+        with open(portReg, 'w',newline='') as f:
+            portRegWriter = csv.writer(f)
+            portRegWriter.writerows(updatedRegistrations)
+        return updatedRegistrations
+    
+    def createPortReg(self):
+        portReg  = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.csv"
+        if not os.path.isfile(portReg):
+            with open(portReg,"x"):
+                pass
+
+
+    def startPortReg(self):
+        self.createPortReg()
+        portInfos = self.readPortReg()
+        portInfos = self.removeOutdatedRegs(portInfos)
+        return portInfos
+
+    def appendPortReg(self,pid,port):
+        portReg  = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.csv"
+        with open(portReg,'a') as f:
+            f.write(str(pid) +","+str(port) + os.linesep)
+
+
 
 class BtcApiException(Exception):
     """Custom exception for BTC EmbeddedPlatform API errors."""
