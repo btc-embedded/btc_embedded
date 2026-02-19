@@ -94,8 +94,9 @@ class EPRestApi:
         self._set_message_marker()
         self._init_logging()
 
-        self.reservePortRegLock()
-        portInfos = self.startPortReg()
+        if platform.system() == 'Windows':
+            self.reservePortRegLock()
+            portInfos = self.startPortReg()
         #Search for open port if enabled
         try:
             if self.force_new_port:
@@ -128,7 +129,8 @@ class EPRestApi:
             # Start / Connect to the BTC EmbeddedPlatform
             #
             if self._is_rest_service_available(version):
-                self.clearPortRegLock()
+                if platform.system() == 'Windows':
+                    self.clearPortRegLock()
                 # connect to a running application
                 version = self.get('openapi.json')['info']['version']
                 logger.info(f'Connected to BTC EmbeddedPlatform {version} at {host}:{self._PORT_}')            
@@ -145,7 +147,8 @@ class EPRestApi:
             self._apply_preferences(version)
             self.version = version
         except Exception:
-            self.clearPortRegLock()
+            if platform.system() == 'Windows':
+                self.clearPortRegLock()
             raise(Exception)
         
 
@@ -816,8 +819,9 @@ class EPRestApi:
             args += " " + " ".join(additional_vmargs)
         self.ep_process = subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
 
-        self.appendPortReg(self.ep_process.pid, self._PORT_)
-        self.clearPortRegLock()
+        if platform.system() == 'Windows':
+            self.appendPortReg(self.ep_process.pid, self._PORT_)
+            self.clearPortRegLock()
 
         self.actively_started = True
 
