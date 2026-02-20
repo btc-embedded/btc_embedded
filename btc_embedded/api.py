@@ -12,7 +12,9 @@ import time
 from datetime import datetime
 from urllib.parse import quote, unquote
 
+
 import requests
+from btc_embedded.portRegistry import (reservePortRegLock, startPortReg, clearPortRegLock, appendPortReg)
 
 from btc_embedded.config import (BTC_CONFIG_ENVVAR_NAME,
                                  get_config_path_from_resources,
@@ -95,10 +97,15 @@ class EPRestApi:
         self._init_logging()
 
         if platform.system() == 'Windows':
-            self.reservePortRegLock()
-            portInfos = self.startPortReg()
-        #Search for open port if enabled
+            reservePortRegLock()
+            try:
+                portInfos = startPortReg()
+            except Exception as e:
+                clearPortRegLock()
+                raise(e)
+            
         try:
+            #Search for open port if enabled
             if self.force_new_port:
                 host_no_protocol = self._HOST_.replace("http://","").replace("https://","")
                 self._PORT_ = str(self._find_next_port(int(self._PORT_), host_no_protocol,portInfos))
@@ -130,7 +137,7 @@ class EPRestApi:
             #
             if self._is_rest_service_available(version):
                 if platform.system() == 'Windows':
-                    self.clearPortRegLock()
+                    clearPortRegLock()
                 # connect to a running application
                 version = self.get('openapi.json')['info']['version']
                 logger.info(f'Connected to BTC EmbeddedPlatform {version} at {host}:{self._PORT_}')            
@@ -146,10 +153,10 @@ class EPRestApi:
                 logger.info('BTC EmbeddedPlatform has started.')
             self._apply_preferences(version)
             self.version = version
-        except Exception:
+        except Exception as e:
             if platform.system() == 'Windows':
-                self.clearPortRegLock()
-            raise(Exception)
+                clearPortRegLock()
+            raise(e)
         
 
     # - - - - - - - - - - - - - - - - - - - - 
@@ -820,8 +827,8 @@ class EPRestApi:
         self.ep_process = subprocess.Popen(args, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
 
         if platform.system() == 'Windows':
-            self.appendPortReg(self.ep_process.pid, self._PORT_)
-            self.clearPortRegLock()
+            appendPortReg(self.ep_process.pid, self._PORT_)
+            clearPortRegLock()
 
         self.actively_started = True
 
@@ -968,71 +975,6 @@ class EPRestApi:
             logger.error(f"All ports greater than {initial_port} searched. No open port found. Please provide the specific port to connect to.")
             raise BtcApiException("No open port found.")
         return open_port
-
-    def reservePortRegLock(self):
-        lockLocation = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.lock"
-        print("bb")
-        while os.path.isfile(lockLocation):
-            print(time.time() - os.path.getmtime(lockLocation))
-            try:
-                if time.time() - os.path.getmtime(lockLocation) > 30:
-                    os.remove(lockLocation)
-            except:
-                pass
-            time.sleep(0.5)
-        try:
-            with open(lockLocation,"w") as f:
-                return True
-        except:
-            return False
-
-    def clearPortRegLock(self):
-        lockLocation = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.lock"
-        if os.path.isfile(lockLocation):
-            os.remove(lockLocation)
-    
-
-    def readPortReg(self):
-        import csv
-        portInfos = []
-        portReg  = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.csv"
-        with open(portReg,"r") as f:
-            regReader = csv.reader(f)
-            for row in regReader:
-                if not row == []:
-                    portInfos.append(row)
-        return portInfos
-    
-    def removeOutdatedRegs(self,portInfos):
-        import csv
-
-        portReg  = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.csv"
-
-        runningProcesses = subprocess.check_output('tasklist').decode().replace(" ","")
-        updatedRegistrations = [[reg[0],reg[1]] for reg in portInfos if "ep.exe"+reg[0] in runningProcesses]
-
-        with open(portReg, 'w',newline='') as f:
-            portRegWriter = csv.writer(f)
-            portRegWriter.writerows(updatedRegistrations)
-        return updatedRegistrations
-    
-    def createPortReg(self):
-        portReg  = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.csv"
-        if not os.path.isfile(portReg):
-            with open(portReg,"x"):
-                pass
-
-
-    def startPortReg(self):
-        self.createPortReg()
-        portInfos = self.readPortReg()
-        portInfos = self.removeOutdatedRegs(portInfos)
-        return portInfos
-
-    def appendPortReg(self,pid,port):
-        portReg  = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.csv"
-        with open(portReg,'a') as f:
-            f.write(str(pid) +","+str(port) + os.linesep)
 
 
 
