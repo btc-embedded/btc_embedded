@@ -5,11 +5,11 @@ portReg  = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.csv"
 LOCK_MAX_LIFESPAN = 30
 logger = logging.getLogger('btc_embedded')
 
+
 def reservePortRegLock():
-    #print("bb")
+    ensurePortRegDir()
     while os.path.isfile(lockLocation):
         logger.debug("Waiting on port registry lock")
-        #print(time.time() - os.path.getmtime(lockLocation))
         try:
             #Force delete lock as a back-up
             if time.time() - os.path.getmtime(lockLocation) > LOCK_MAX_LIFESPAN:
@@ -23,7 +23,7 @@ def reservePortRegLock():
             logger.debug("Port registry lock acquired")
             return True
     except:
-        #Recursion should be alright as the lock will be force-deleted if it is too old.
+        # protects against the extremely unlikely case of two EPs starting at the exact same time and both passing the initial check for the lock file, then both trying to create it at the same time. Only one will succeed, the other will get an exception and wait for the next loop to acquire the lock.
         reservePortRegLock()
 
 def clearPortRegLock():
@@ -41,7 +41,7 @@ def readPortReg():
     return portInfos
 
 def removeOutdatedRegs(portInfos):
-    #startTime = time.time()
+    ensurePortRegDir()
     startupinfo = subprocess.STARTUPINFO()
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     startupinfo.wShowWindow = subprocess.SW_HIDE
@@ -52,10 +52,10 @@ def removeOutdatedRegs(portInfos):
     with open(portReg, 'w',newline='') as f:
         portRegWriter = csv.writer(f)
         portRegWriter.writerows(updatedRegistrations)
-    #print("removing outdated took", time.time()-startTime)
     return updatedRegistrations
 
 def createPortReg():
+    ensurePortRegDir()
     if not os.path.isfile(portReg):
         with open(portReg,"x"):
             pass
@@ -68,5 +68,9 @@ def startPortReg():
     return portInfos
 
 def appendPortReg(pid,port):
+    ensurePortRegDir()
     with open(portReg,'a') as f:
         f.write(str(pid) +","+str(port) + os.linesep)
+
+def ensurePortRegDir():
+    os.makedirs(os.path.dirname(lockLocation), exist_ok=True)
