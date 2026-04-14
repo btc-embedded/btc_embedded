@@ -13,6 +13,7 @@ The python module btc_embedded lets you start & stop a headless BTC EmbeddedPlat
 - Importing it in your Python script: **from btc_embedded import EPRestApi**
 - Creating the API object: **ep = EPRestApi()**
 
+
 When creating the API object without further parameters, the module looks for an instance of BTC EmbeddedPlatform on http://localhost:1337. If it doesn't find a running instance, it will start one and return once it connected to it. The console output will look roughly like this:
 
 ```Applying global config from 'C:\ProgramData\BTC\ep\btc_config.yml'
@@ -145,3 +146,13 @@ from btc_embedded import EPRestApi, LOGGING_DISABLED
 # disable logging
 ep = EPRestApi(log_level=LOGGING_DISABLED)
 ```
+
+## LLM Hook SDK
+The `llm_hook_sdk` package is bundled in the `btc_embedded` distribution.
+After installing `btc_embedded`, import SDK types directly via:
+
+```python
+from llm_hook_sdk import ChatResponse
+```
+
+This keeps existing SDK imports stable while shipping both packages together.

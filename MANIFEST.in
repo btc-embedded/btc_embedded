@@ -1,1 +1,2 @@
 include btc_embedded/resources/* btc_embedded/resources/projectreport_templates/*.xml
+recursive-include llm-hook-sdk/src/llm_hook_sdk *.py *.pyi py.typed
