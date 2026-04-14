@@ -11,7 +11,7 @@ authors = [
     {name = "Ferdinand Becker", email = "ferdinand.becker@btc-embedded.com"},
 ]
 
-version = "25.3.4"
+version = "25.3.5b"
 
 license = "MIT"
 description="API wrapper for BTC EmbeddedPlatform REST API"
@@ -39,4 +39,15 @@ classifiers=[
 Homepage = "https://github.com/btc-embedded/btc_embedded"
 
 [tool.setuptools]
-packages=["btc_embedded"]
+packages = ["btc_embedded", "llm_hook_sdk"]
+include-package-data = true
+
+[tool.setuptools.package-dir]
+llm_hook_sdk = "llm-hook-sdk/src/llm_hook_sdk"
+
+[tool.setuptools.package-data]
+btc_embedded = [
+    "resources/*",
+    "resources/projectreport_templates/*.xml",
+]
+llm_hook_sdk = ["*.pyi", "py.typed"]
