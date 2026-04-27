@@ -14,7 +14,8 @@ from urllib.parse import quote, unquote
 
 
 import requests
-from btc_embedded.portRegistry import (reservePortRegLock, startPortReg, clearPortRegLock, appendPortReg)
+if platform.system() == 'Windows':
+    from btc_embedded.portRegistry import (reservePortRegLock, startPortReg, clearPortRegLock, appendPortReg)
 
 from btc_embedded.config import (BTC_CONFIG_ENVVAR_NAME,
                                  get_config_path_from_resources,
