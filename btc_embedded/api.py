@@ -38,7 +38,8 @@ EXCLUDED_ERROR_MESSAGES = [
 EXCLUDED_LOG_MESSAGES = [
     'Registry key could not be read: The system cannot find the file specified',
     'The compiler is already defined',
-    'EpexCompilerServiceImpl - Compilation failed'
+    'EpexCompilerServiceImpl - Compilation failed',
+    'CurVer (type String) does not exist'
 ]
 
 LOGGING_DISABLED = 1337
@@ -147,7 +148,6 @@ class EPRestApi:
                 if platform.system() == 'Windows': self._start_app_windows(version, install_location, port, license_location, lic, additional_vmargs)
                 elif platform.system() == 'Linux': version = self._start_app_linux(license_location, lic, skip_matlab_start, additional_vmargs)
 
-                
                 logger.info(f'Connecting to BTC EmbeddedPlatform REST API at {host}:{self._PORT_}')
                 self._connect_within_timeout(timeout, version)
                 
@@ -418,19 +418,21 @@ class EPRestApi:
     #   PRIVATE HELPER FUNCTIONS
     # - - - - - - - - - - - - - - - - - - - - 
 
+    def _connect_only():
+        return "BTC_STARTED" in os.environ and os.environ["BTC_STARTED"] == "1"
+
     def _connect_within_timeout(self, timeout, version):
         """Waits until the REST service is available or the timeout is reached. Frequently checks if the EP process is still alive."""
         while not self._is_rest_service_available(version):
             if (time.time() - self.start_time) > timeout:
                 logger.error(f"\n\nCould not connect to EP within the specified timeout of {timeout} seconds. \n\n")
                 raise BtcApiException("Application didn't respond within the defined timeout.")
-            elif (not self._is_ep_process_still_alive()):
+            elif (not self._connect_only() and not self._is_ep_process_still_alive()):
                 logger.error(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")                
                 self.print_log_entries()
                 raise BtcApiException("Application failed to start.")
             time.sleep(2)
-            #print('.', end='')
-
+           #print('.', end='')
     
     # extracts the response object which can be nested in different ways
     def _extract_result(self, response):
@@ -727,7 +729,6 @@ class EPRestApi:
     def _prepare_env(self):
         props_with_default_values = {
             'EP_INSTALL_PATH' : '/opt/ep',
-            'EP_REGISTRY' : '/opt/Configuration/eplinuxregistry',
             'EP_LOG_CONFIG' : '/opt/ep/configuration/logback_linux.xml',
             'LOG_DIR' : '/tmp/ep/logs',
             'WORK_DIR' : '/tmp/ep/workdir',
@@ -751,6 +752,11 @@ class EPRestApi:
             version = re.search(r'/ep/(\d+\.\d+[a-zA-Z]*\d+)/', content).group(1)
         except:
             version = '24.2p0'
+
+        if self._connect_only():
+            return version
+
+        os.environ['EP_REGISTRY'] = '/opt/Configuration/eplinuxregistry' if version < '25.2p0' else '/opt/configuration/eplinuxregistry'
         headless_application_id = 'ep.application.headless' if version < '23.3p0' else 'ep.application.headless.HeadlessApplication'
         matlab_ip = os.environ['MATLAB_IP'] if 'MATLAB_IP' in os.environ else '127.0.0.1'
         logger.info(f'Waiting for BTC EmbeddedPlatform {version} to be available:')
