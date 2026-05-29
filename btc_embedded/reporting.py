@@ -22,8 +22,13 @@ def create_report_from_json(json_path):
 # 
 # ----------------------------- Main-function -----------------------------
 # 
-def create_test_report_summary(results={}, report_title='BTC Test Report Summary', report_name='BTCTestReportSummary.html', target_dir='.', additional_stats={}):
+def create_test_report_summary(results=None, report_title='BTC Test Report Summary', report_name='BTCTestReportSummary.html', target_dir='.', additional_stats=None):
     """Takes a dict of individual results an creates a summary report including additional metadata stats."""
+    if results is None:
+        results = {}
+    if additional_stats is None:
+        additional_stats = {}
+
     def total_duration(results):
         try: 
             return sum(project['duration'] for _, project in results.items() if 'duration' in project or 0)
@@ -50,6 +55,9 @@ def create_test_report_summary(results={}, report_title='BTC Test Report Summary
     # aggregate total_duration and overall_status
     total_duration_seconds = total_duration(results)
     projects_with_duration = [r for _, r in results.items() if 'duration' in r]
+    average_duration = ""
+    if total_duration_seconds and projects_with_duration:
+        average_duration = seconds_to_hms(total_duration_seconds // len(projects_with_duration))
 
     # prepare projects_string, containing info for all projects
     projects_string = ''
@@ -65,7 +73,7 @@ def create_test_report_summary(results={}, report_title='BTC Test Report Summary
                               .replace('__creator__', getpass.getuser() or os.getenv('USERNAME') or os.getenv('USER'))\
                               .replace('__timestamp__', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))\
                               .replace('__totalDuration__', seconds_to_hms(total_duration_seconds) if total_duration_seconds else "")\
-                              .replace('__averageDuration__', seconds_to_hms(total_duration_seconds // len(projects_with_duration)) if total_duration_seconds else "")\
+                              .replace('__averageDuration__', average_duration)\
                               .replace('__overallStatus__', overall_status(results, additional_stats))\
                               .replace('__numberOfProjects__', str(len(results)))\
                               .replace('__numberOfProjectsPassed__', str(sum(1 for _, project in results.items() if "testResult" in project and project["testResult"] == "PASSED")))\
@@ -132,6 +140,7 @@ def get_project_string(result, target_dir):
     elif result["status"] in ['PASSED', 'COMPLETED']: statusIcon = 'icon-sdc'
     elif result["status"] == 'FAILED': statusIcon = 'icon-wdc'
     elif result["status"] == 'ERROR': statusIcon = 'icon-edc'
+    else: statusIcon = 'icon-mc'
 
     report_link = f'<a href="{report_relpath}">{result["projectName"]}</a>' if report_relpath else result["projectName"]
     project_html_entry = template.format(

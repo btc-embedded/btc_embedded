@@ -1,30 +1,50 @@
 import os, time, csv, subprocess, logging
 
-lockLocation = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.lock"
-portReg  = os.environ['APPDATA'].replace('\\', '/') + "/BTC/restPortReg.csv"
+APPDATA = os.environ.get('APPDATA')
+lockLocation = (APPDATA.replace('\\', '/') + "/BTC/restPortReg.lock") if APPDATA else None
+portReg  = (APPDATA.replace('\\', '/') + "/BTC/restPortReg.csv") if APPDATA else None
 LOCK_MAX_LIFESPAN = 30
+LOCK_MAX_WAIT_SECONDS = 60
 logger = logging.getLogger('btc_embedded')
+
+
+def _ensure_windows():
+    if not APPDATA:
+        raise RuntimeError("portRegistry is only supported on Windows environments (APPDATA not set).")
 
 
 def reservePortRegLock():
     ensurePortRegDir()
-    while os.path.isfile(lockLocation):
-        logger.debug("Waiting on port registry lock")
+    start_time = time.time()
+    while True:
+        if time.time() - start_time > LOCK_MAX_WAIT_SECONDS:
+            raise TimeoutError(f"Timed out waiting for port registry lock at '{lockLocation}'.")
+
+        if os.path.isfile(lockLocation):
+            logger.debug("Waiting on port registry lock")
+            try:
+                # Force delete stale lock as a back-up.
+                if time.time() - os.path.getmtime(lockLocation) > LOCK_MAX_LIFESPAN:
+                    os.remove(lockLocation)
+                    logger.warning("Removed stale port registry lock file.")
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                logger.warning(f"Could not inspect or remove lock file '{lockLocation}': {e}")
+            time.sleep(0.5)
+            continue
+
         try:
-            #Force delete lock as a back-up
-            if time.time() - os.path.getmtime(lockLocation) > LOCK_MAX_LIFESPAN:
-                os.remove(lockLocation)
-        except:
-            pass
-        time.sleep(0.5)
-    try:
-        #x should return an exception if the file is already created. In case of EPs started at extremely similar times.
-        with open(lockLocation,"x") as f:
-            logger.debug("Port registry lock acquired")
-            return True
-    except:
-        # protects against the extremely unlikely case of two EPs starting at the exact same time and both passing the initial check for the lock file, then both trying to create it at the same time. Only one will succeed, the other will get an exception and wait for the next loop to acquire the lock.
-        reservePortRegLock()
+            # x should return an exception if the file is already created.
+            with open(lockLocation, "x"):
+                logger.debug("Port registry lock acquired")
+                return True
+        except FileExistsError:
+            # Another process acquired the lock between check and create.
+            time.sleep(0.1)
+        except OSError as e:
+            logger.error(f"Failed to acquire port registry lock '{lockLocation}': {e}")
+            raise
 
 def clearPortRegLock():
     if os.path.isfile(lockLocation):
@@ -73,4 +93,5 @@ def appendPortReg(pid,port):
         f.write(str(pid) +","+str(port) + os.linesep)
 
 def ensurePortRegDir():
+    _ensure_windows()
     os.makedirs(os.path.dirname(lockLocation), exist_ok=True)

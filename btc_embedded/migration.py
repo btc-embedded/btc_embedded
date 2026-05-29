@@ -19,6 +19,14 @@ report_json = None
 MIGRATION_PHASE_OLD = 'Old'
 MIGRATION_PHASE_NEW = 'New'
 
+
+def _get_mil_config(exec_config_names, context=''):
+    mil_config = next((cfg for cfg in exec_config_names if 'MIL' in cfg), None)
+    if mil_config:
+        return mil_config
+    suffix = f" in {context}" if context else ""
+    raise Exception(f"No MIL execution config found{suffix}. Available configs: {exec_config_names}")
+
 def migration_suite_source(models, matlab_version, toolchain_script=None, test_mil=False, export_executions=False, reuse_code=False, vector_gen_settings=None, ep=None):
     """For each of the given models this function generates tests for
     full coverage on the given model using the specified Matlab version,
@@ -378,7 +386,7 @@ def src_04_reference_simulation(ep, scope_uid, test_mil, export_executions, resu
         if test_mil:
             if ep.version >= '22.1p0': payload['folderName'] = 'old-mil'
             old_mil_folder = ep.post('folders', payload)
-            mil_execution_config = next(cfg for cfg in mil_sil_configs if 'MIL' in cfg)
+            mil_execution_config = _get_mil_config(mil_sil_configs, context='reference simulation')
             mil_execution_records_uids = [ er['uid'] for er in all_execution_records if er['executionConfig'] == mil_execution_config]
             ep.put(f"folders/{old_mil_folder['uid']}/execution-records", { 'UIDs' : mil_execution_records_uids })
             
@@ -412,7 +420,8 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, sco
         # Arch Update
         message=f"Updating model & generating code for {model_name} with Matlab {matlab_version}"
         # get mil config (can be TL MIL or SL MIL)
-        mil_config = next(cfg for cfg in ep.get('execution-configs')['execConfigNames'] if 'MIL' in cfg)
+        exec_config_names = ep.get('execution-configs')['execConfigNames']
+        mil_config = _get_mil_config(exec_config_names, context='architecture update')
         if mil_config == 'SL MIL':
             payload = {
                 'slModelFile' : model_path,
@@ -489,7 +498,8 @@ def tgt_05_profile_with_refs(ep, epp_file, model_path, script_path, scope_name, 
         # MIL
         if test_mil and mil_executions:
             # get mil config (can be TL MIL or SL MIL)
-            mil_config = next(cfg for cfg in ep.get('execution-configs')['execConfigNames'] if 'MIL' in cfg)
+            exec_config_names = ep.get('execution-configs')['execConfigNames']
+            mil_config = _get_mil_config(exec_config_names, context='reference execution import')
             payload = {'folderKind': 'EXECUTION_RECORD', 'folderName' : 'old-mil' }
             old_mil_folder = ep.post('folders', payload)
             payload = { 'paths' : mil_executions, 'kind' : mil_config, 'folderUID' : old_mil_folder['uid']}
@@ -562,7 +572,8 @@ def tgt_07_regression_test_mil(ep, model_name, results):
         step_result = { 'stepName' : 'Regression Test (MIL)' }
         update_report_running(model_name, step_result)
         # get mil config (can be TL MIL or SL MIL)
-        mil_config = next(cfg for cfg in ep.get('execution-configs')['execConfigNames'] if 'MIL' in cfg)
+        exec_config_names = ep.get('execution-configs')['execConfigNames']
+        mil_config = _get_mil_config(exec_config_names, context='MIL regression test')
         payload = {'folderKind': 'EXECUTION_RECORD', 'folderName' : 'new-mil' }
         new_mil_folder = ep.post('folders', payload)
         old_mil_folder = ep.get('folders?name=old-mil')[0]
@@ -668,7 +679,8 @@ def get_wrapper_free_path(model_path):
 def select_report_template(ep, test_mil):
     # pick the right report template
     if test_mil:
-        mil_config = next(cfg for cfg in ep.get('execution-configs')['execConfigNames'] if 'MIL' in cfg)
+        exec_config_names = ep.get('execution-configs')['execConfigNames']
+        mil_config = _get_mil_config(exec_config_names, context='report template selection')
         report_template = 'regression-test-ec' if mil_config == 'SL MIL' else 'regression-test-tl'
     else:
         report_template = 'regression-test-sil-only'
@@ -765,8 +777,10 @@ def get_project_result_item(model_name, epp_rel_path, start_time, b2b_coverage=N
 
     return result
 
-def update_report(project_item=None, additional_stats={}):
+def update_report(project_item=None, additional_stats=None):
     global report_json
+    if additional_stats is None:
+        additional_stats = {}
     if report_json:
         # load existing state
         with open(report_json, "r") as f:
@@ -801,8 +815,10 @@ def update_report(project_item=None, additional_stats={}):
 
         create_report_from_json(json_path=report_json)
 
-def initialize_report(models, title, filename, additional_stats={}):
+def initialize_report(models, title, filename, additional_stats=None):
     global report_json; report_json = os.path.abspath(os.path.join('results', 'report.json'))
+    if additional_stats is None:
+        additional_stats = {}
     os.makedirs(os.path.dirname(report_json), exist_ok=True)
     report_data = {
         'title' : title,

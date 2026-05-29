@@ -40,6 +40,8 @@ def install_btc_config():
     else:
         key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\BTC", access=winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
         ep_version = None
+        install_location = None
+        highest_ml_version = None
         for subkey_name in _get_subkeys(key):
             if subkey_name.startswith("EmbeddedPlatform"):
                 ep_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\BTC\{subkey_name}")
@@ -57,7 +59,6 @@ def install_btc_config():
                     value_data, _ = winreg.QueryValueEx(ep_key, "Path")
                     install_location = value_data
                     # matlab
-                    highest_ml_version = None
                     for subkey_name in _get_subkeys(ep_key):
                         if subkey_name.startswith("MATLAB"):
                             highest_ml_version = subkey_name

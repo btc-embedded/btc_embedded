@@ -18,14 +18,16 @@ def run_matlab_script(ep, matlab_script_abs_path):
         },
         message=f"Evaluating '{matlab_script_abs_path}' in Matlab base workspace.")
 
-def run_matlab_function(ep, matlab_script_abs_path, args=[]):
+def run_matlab_function(ep, matlab_script_abs_path, args=None):
     """Adds the script's parent directory to the matlab path,
     then executes the script with the given arguments.
 
     If you want to simply run a function that is already known to Matlab,
     please use ep.post('execute-long-matlab-script') directly."""
-    if not (matlab_script_abs_path[-2:] == '.m') and (os.path.isabs(matlab_script_abs_path)):
+    if not (matlab_script_abs_path.endswith('.m') and os.path.isabs(matlab_script_abs_path)):
         raise Exception(f"Expecting absolute path to a matlab script file (*.m) but received '{matlab_script_abs_path}'")
+    if args is None:
+        args = []
     
     # add m-script's parent dir to matlab path
     script_dir, script_file = os.path.split(matlab_script_abs_path)
@@ -130,6 +132,7 @@ def determine_codegen_type(ep, model_file):
 #         return valid_tlc
 
     if not os.path.isfile(model_file): raise Exception(f"Model file '{model_file}' not found.")
+    temp_dir = None
     try:
         # extract model xml content
         temp_dir = extract_slx(model_file)
@@ -148,7 +151,7 @@ def determine_codegen_type(ep, model_file):
         shutil.rmtree(temp_dir, ignore_errors=True)    
         
         return codegen_type
-    except:
+    except Exception:
         # clean up model xml content
         if temp_dir: shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -234,8 +237,9 @@ def dump_testresults_junitxml(
     testsuites = ET.Element('testsuites', name=project_name)
     tcs_by_uid = { tc['uid'] : tc for tc in test_cases } if test_cases else None
     scopes_by_uid = { scope['uid'] : scope for scope in scopes } if scopes else None
-    total_tests = total_tests = total_errors = total_failures = total_skipped = 0
+    total_tests = total_errors = total_failures = total_skipped = 0
     output_file = os.path.abspath(output_file)
+    duration_seconds = None
     if start_time: duration_seconds = (datetime.now() - start_time).seconds
 
     # Helper function to add test cases
@@ -261,23 +265,18 @@ def dump_testresults_junitxml(
             # sort by tc name
             rbt_response['testResults'].sort(key=lambda item: tcs_by_uid[item['rbTestCaseUID']]['name'] if tcs_by_uid else item['rbTestCaseUID'])
             for test_result in rbt_response['testResults']:
-                ts_tests = ts_tests = ts_errors = ts_failures = ts_skipped = 0
                 tc_name = tcs_by_uid[test_result['rbTestCaseUID']]['name'] if tcs_by_uid else test_result['rbTestCaseUID']
                 scope_uid = tcs_by_uid[test_result['rbTestCaseUID']]['scopeUID'] if tcs_by_uid else None
                 classname = scopes_by_uid[scope_uid]['path'] if scope_uid else ""
                 
                 # count
                 total_tests += 1
-                ts_tests += 1
                 if test_result['verdictStatus'] == 'ERROR':
                     total_errors += 1
-                    ts_errors += 1
                 if test_result['verdictStatus'] == 'FAILED':
                     total_failures += 1
-                    ts_failures += 1
                 if test_result['verdictStatus'] in ['NO_VERDICT', 'MISSING_EXECUTION']:
                     total_skipped += 1
-                    ts_skipped += 1
 
                 add_testcase(
                     testsuite,

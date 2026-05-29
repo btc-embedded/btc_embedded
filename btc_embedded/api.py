@@ -59,7 +59,7 @@ class EPRestApi:
         lic='',
         config=None,
         license_location=None,
-        additional_vmargs=[],
+        additional_vmargs=None,
         timeout=120,
         skip_matlab_start=False,
         skip_config_install=False,
@@ -97,6 +97,9 @@ class EPRestApi:
         # default message marker date to 1 second before the start time (to be sure to include all following messages)
         self._set_message_marker()
         self._init_logging()
+        if additional_vmargs is None:
+            additional_vmargs = []
+        portInfos = []
 
         if platform.system() == 'Windows':
             reservePortRegLock()
@@ -186,7 +189,7 @@ class EPRestApi:
     # wrapper directly returns the relevant object if possible
     def get(self, urlappendix, message=None, timeout=None):
         """Returns the result object, or the response, if no result object is available."""
-        response = self.get_req(urlappendix, message)
+        response = self.get_req(urlappendix, message, timeout)
         return self._extract_result(response)
     
     # wrapper directly returns the relevant object if possible
@@ -348,7 +351,7 @@ class EPRestApi:
             self._handle_error(e, urlappendix)
         finally:
             self._the_watch_has_ended(urlappendix)
-        return self._check_long_running(response, urlappendix,timeout)
+        return self._check_long_running(response, urlappendix, timeout=timeout)
     
     # Performs a delete request on the given url extension
     def delete_req(self, urlappendix, requestBody=None, message=None, timeout=None):
@@ -418,7 +421,7 @@ class EPRestApi:
     #   PRIVATE HELPER FUNCTIONS
     # - - - - - - - - - - - - - - - - - - - - 
 
-    def _connect_only():
+    def _connect_only(self):
         return "BTC_STARTED" in os.environ and os.environ["BTC_STARTED"] == "1"
 
     def _connect_within_timeout(self, timeout, version):
@@ -440,14 +443,14 @@ class EPRestApi:
         If this data has a result field (common for post requests), its content is returned, otherwise the data object itself.
         If the response object has no data, the response iteslf is returned."""
         try:
-            content_type = response.headers.get('Content-Type')
-            if content_type == 'application/json':
+            content_type = (response.headers.get('Content-Type') or '').lower()
+            if content_type.startswith('application/json'):
                 result = response.json()
                 if 'result' in result:
                     return result['result']
                 else:
                     return result
-            elif content_type == 'text/plain':
+            elif content_type.startswith('text/plain'):
                 return response.text
             else:
                 return response
@@ -573,7 +576,7 @@ class EPRestApi:
                 elif pref_key == 'ARCHITECTURE_EC_CUSTOM_USER_CONFIGURATION_FOLDER':
                     ec_cfg_folder  = self._rel_to_abs(config['preferences'][pref_key])
                     preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': ec_cfg_folder })
-                elif pref_key == 'GENERAL_DATE_FORMAT_PATTERN' or pref_key == 'GENERAL_TIME_FORMAT_PATTERN' and version >= '24.3p0':
+                elif (pref_key == 'GENERAL_DATE_FORMAT_PATTERN' or pref_key == 'GENERAL_TIME_FORMAT_PATTERN') and version >= '24.3p0':
                     user_defined_datetime_format = True
                     preferences.append( { 'preferenceName' : pref_key, 'preferenceValue': config['preferences'][pref_key] })
                 # all other cases
@@ -660,21 +663,24 @@ class EPRestApi:
         index_qmark = urlappendix.find('?')
         query_params_string = urlappendix[index_qmark+1:] if index_qmark > 0 else ""
         if query_params_string:
+            path = None
             query_param_pairs = query_params_string.split('&')
             for qpp in query_param_pairs:
-                key, value = qpp.split('=')
+                key, _, value = qpp.partition('=')
                 if key == 'path':
                     path = unquote(value) # unquote incase caller already quoted the path
                     if path and not os.path.isfile(path) and self._is_localhost():
                         logger.critical(f"\nThe profile '{path}' cannot be found. Please ensure that the file is available.\n")
-                        exit(1)
+                        raise BtcApiException(f"The profile '{path}' cannot be found.")
                     path = quote(path, safe="")
                     break
+            if not path:
+                raise BtcApiException("Missing 'path' query parameter in openprofile request.")
             if path:
                 # reconstruct query params string
                 new_query_params = []
                 for qpp2 in query_param_pairs:
-                    key2, _ = qpp2.split('=')
+                    key2, _, _ = qpp2.partition('=')
                     if key2 == 'path':
                         new_query_params.append(f"{key2}={path}")
                     else:
@@ -691,7 +697,7 @@ class EPRestApi:
         path = unquote(path) # unquote incase caller already quoted the path
         if path and not os.path.isfile(path) and self._is_localhost():
             logger.critical(f"\nThe profile '{path}' cannot be found. Please ensure that the file is available.\n")
-            exit(1)
+            raise BtcApiException(f"The profile '{path}' cannot be found.")
         path = quote(path, safe="")
         if convert_to_post253:
             return 'openprofile?path=' + path

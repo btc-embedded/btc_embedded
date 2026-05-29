@@ -44,9 +44,9 @@ def get_project_specific_config(project_directory=os.getcwd(), project_config=No
     for root, _, files in os.walk(project_directory):
         for name in files:
             if fnmatch.fnmatch(name, 'btc_project_config.yml'):
-                path = root + '/' + name
+                path = os.path.join(root, name)
                 project_specific_config = __load_config(path)
-                break
+                return project_specific_config, path
     return project_specific_config, path
 
 def get_merged_config(project_directory=os.getcwd(), silent=False, project_config=None):
