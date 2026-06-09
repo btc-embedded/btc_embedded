@@ -1,0 +1,41 @@
+{
+  "version":"1.0",
+  "configuration":{
+    "signals":{
+      "parameters":[ {
+        "name":"params.high",
+        "visible":false
+      }, {
+        "name":"params.medium",
+        "visible":false
+      }, {
+        "name":"params.low",
+        "visible":false
+      } ],
+      "locals":[ {
+        "name":"isSystemActive",
+        "visible":false
+      }, {
+        "name":"state.prevButtonPressed",
+        "visible":false
+      }, {
+        "name":"state.temperatureStage",
+        "visible":false
+      } ],
+      "outputs":[ {
+        "name":"heatingCoilTemp",
+        "visible":false
+      }, {
+        "name":"leds[1]",
+        "folded":false
+      }, {
+        "name":"leds[2]",
+        "folded":false
+      }, {
+        "name":"leds[0]",
+        "folded":false
+      } ]
+    },
+    "hiddenSteps":[ 1, 2, 3, 4, 5 ]
+  }
+}

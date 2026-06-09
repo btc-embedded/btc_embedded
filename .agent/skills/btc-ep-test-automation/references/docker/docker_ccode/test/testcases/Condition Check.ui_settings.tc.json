@@ -1,0 +1,41 @@
+{
+  "version":"1.0",
+  "configuration":{
+    "signals":{
+      "inputs":[ {
+        "name":"getButtonPressed_stub",
+        "visible":false
+      } ],
+      "parameters":[ {
+        "name":"params.high",
+        "visible":false
+      }, {
+        "name":"params.medium",
+        "visible":false
+      }, {
+        "name":"params.low",
+        "visible":false
+      } ],
+      "locals":[ {
+        "name":"state.prevButtonPressed",
+        "visible":false
+      }, {
+        "name":"state.temperatureStage",
+        "visible":false
+      } ],
+      "outputs":[ {
+        "name":"heatingCoilTemp",
+        "visible":false
+      }, {
+        "name":"leds[1]",
+        "visible":false
+      }, {
+        "name":"leds[2]",
+        "visible":false
+      }, {
+        "name":"leds[0]",
+        "visible":false
+      } ]
+    }
+  }
+}

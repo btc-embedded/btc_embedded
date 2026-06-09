@@ -1,0 +1,25 @@
+{
+  "version":"1.0",
+  "configuration":{
+    "signals":{
+      "parameters":[ {
+        "name":"TemperatureRanges_TemperatureStage2",
+        "visible":false
+      }, {
+        "name":"TemperatureRanges_TemperatureStage1",
+        "visible":false
+      } ],
+      "outputs":[ {
+        "name":"LEDFeedback_LEDFeedback(3)",
+        "visible":false
+      }, {
+        "name":"LEDFeedback_LEDFeedback(1)",
+        "visible":false
+      }, {
+        "name":"LEDFeedback_LEDFeedback(2)",
+        "visible":false
+      } ]
+    },
+    "hiddenSteps":[ 1, 2, 3, 4, 5 ]
+  }
+}

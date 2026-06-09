@@ -1,0 +1,50 @@
+{
+  "version":"1.1",
+  "metaData":{
+    "name":"Stage2_Request",
+    "scopePath":"seat_heating_controller.c:1:seat_heating_controller",
+    "architecture":"seat_heating_controller [C-Code]",
+    "description":"On the active system, the 2nd button press shall cause the system to request stage 2 heating (depending on the calibration value)",
+    "length":"12"
+  },
+  "vectorContent":{
+    "steps":[ {
+      "step":{
+        "number":"0",
+        "comment":"activate and press button 2 times",
+        "usedTestMacros":[ {
+          "uuid":"2Gr",
+          "name":"activation_conditions_met",
+          "endStep":0,
+          "isPartial":true,
+          "type":"Non-initial"
+        } ],
+        "inputs":[ {
+          "getButtonPressed_stub":"sg(Square, 12, Simulink, true, true, f=5, a=1, o=0, false)"
+        } ],
+        "parameters":[ {
+          "params.low":"30.0"
+        }, {
+          "params.medium":"35.0"
+        }, {
+          "params.high":"45.0"
+        } ]
+      }
+    }, {
+      "step":{
+        "number":"11",
+        "comment":"expect stage 2 heating request after 2 button pushes",
+        "outputs":[ {
+          "heatingCoilTemp":"af(params.medium, 1, false)"
+        } ]
+      }
+    } ]
+  },
+  "requirements":[ "subterra:data-service:objects:/default/seatheater${WorkItem}SEAT-82", "subterra:data-service:objects:/default/seatheater${WorkItem}SEAT-85" ],
+  "interface":{
+    "inputs":[ "seatOccupied", "powerMgtState", "errorStatus", "getButtonPressed_stub" ],
+    "parameters":[ "params.low", "params.medium", "params.high" ],
+    "locals":[ "isSystemActive", "state.prevButtonPressed", "state.temperatureStage" ],
+    "outputs":[ "leds[0]", "leds[1]", "leds[2]", "heatingCoilTemp" ]
+  }
+}

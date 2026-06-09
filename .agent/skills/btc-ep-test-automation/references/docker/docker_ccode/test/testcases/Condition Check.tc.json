@@ -1,0 +1,102 @@
+{
+  "version":"1.1",
+  "metaData":{
+    "name":"Condition Check",
+    "scopePath":"seat_heating_controller.c:1:seat_heating_controller",
+    "architecture":"seat_heating_controller [C-Code]",
+    "description":"Checking the combinations of SeatOccupied status, PowerManangement Status and PowerManagement Error to verify that the system is only enabled when the right conditions are met.",
+    "length":"8"
+  },
+  "vectorContent":{
+    "steps":[ {
+      "step":{
+        "number":"0",
+        "comment":"invalid combos (0-6, 8)",
+        "inputs":[ {
+          "seatOccupied":"0"
+        }, {
+          "powerMgtState":"0"
+        }, {
+          "errorStatus":"0"
+        }, {
+          "getButtonPressed_stub":"0"
+        } ],
+        "parameters":[ {
+          "params.low":"30.0"
+        }, {
+          "params.medium":"35.0"
+        }, {
+          "params.high":"45.0"
+        } ],
+        "locals":[ {
+          "isSystemActive":"af(seatOccupied && powerMgtState && errorStatus == 0, 8, false)"
+        } ]
+      }
+    }, {
+      "step":{
+        "number":"1",
+        "inputs":[ {
+          "errorStatus":"1"
+        } ]
+      }
+    }, {
+      "step":{
+        "number":"2",
+        "inputs":[ {
+          "powerMgtState":"1"
+        }, {
+          "errorStatus":"0"
+        } ]
+      }
+    }, {
+      "step":{
+        "number":"3",
+        "inputs":[ {
+          "errorStatus":"1"
+        } ]
+      }
+    }, {
+      "step":{
+        "number":"4",
+        "inputs":[ {
+          "seatOccupied":"1"
+        }, {
+          "powerMgtState":"0"
+        }, {
+          "errorStatus":"0"
+        } ]
+      }
+    }, {
+      "step":{
+        "number":"5",
+        "inputs":[ {
+          "errorStatus":"1"
+        } ]
+      }
+    }, {
+      "step":{
+        "number":"6",
+        "comment":"seat occupied - power ok - no error",
+        "inputs":[ {
+          "powerMgtState":"1"
+        }, {
+          "errorStatus":"0"
+        } ]
+      }
+    }, {
+      "step":{
+        "number":"7",
+        "inputs":[ {
+          "errorStatus":"1"
+        } ]
+      }
+    } ]
+  },
+  "requirements":[ "subterra:data-service:objects:/default/seatheater${WorkItem}SEAT-79", "subterra:data-service:objects:/default/seatheater${WorkItem}SEAT-81", "subterra:data-service:objects:/default/seatheater${WorkItem}SEAT-83" ],
+  "interface":{
+    "inputs":[ "seatOccupied", "powerMgtState", "errorStatus", "getButtonPressed_stub" ],
+    "parameters":[ "params.low", "params.medium", "params.high" ],
+    "locals":[ "isSystemActive", "state.prevButtonPressed", "state.temperatureStage" ],
+    "outputs":[ "leds[0]", "leds[1]", "leds[2]", "heatingCoilTemp" ]
+  }
+}

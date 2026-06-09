@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeModel>
+	<Files>
+		<File id="ID17" name="seat_heating_controller.c" relPath="..\src" annotate="yes" kind="source" />
+		<File id="ID531" name="stub.c" relPath="." annotate="no" kind="source" />
+	</Files>
+	<Functions>
+		<Function name="seat_heating_controller" sampleTime="1.0" fileref="ID17">
+			<Args />
+			<Interface>
+				<InterfaceObj kind="in" var="seatOccupied" fileref="ID17" />
+				<InterfaceObj kind="in" var="powerMgtState" fileref="ID17" />
+				<InterfaceObj kind="in" var="errorStatus" fileref="ID17" scaling="scID82" />
+				<InterfaceObj kind="disp" var="isSystemActive" fileref="ID17" />
+				<InterfaceObj kind="out" var="leds" fileref="ID17" />
+				<InterfaceObj kind="out" var="heatingCoilTemp" fileref="ID17" scaling="scID82" />
+				<InterfaceObj kind="cal" var="params" access=".low" scaling="scID82" />
+				<InterfaceObj kind="cal" var="params" access=".medium" scaling="scID82" />
+				<InterfaceObj kind="cal" var="params" access=".high" scaling="scID82" />
+				<InterfaceObj kind="disp" var="state" access=".prevButtonPressed" />
+				<InterfaceObj kind="disp" var="state" access=".temperatureStage" scaling="scID82" />
+				<InterfaceObj kind="in" var="getButtonPressed_stub" fileref="ID531" />
+			</Interface>
+		</Function>
+		<Function name="handleTempStage" sampleTime="1.0" fileref="ID17">
+			<Args />
+			<Interface>
+				<InterfaceObj kind="out" var="" scaling="scID82" />
+				<InterfaceObj kind="in" var="temperatureStage" scaling="scID82" />
+				<InterfaceObj kind="out" var="leds" fileref="ID17" />
+				<InterfaceObj kind="cal" var="params" access=".low" scaling="scID82" />
+				<InterfaceObj kind="cal" var="params" access=".medium" scaling="scID82" />
+				<InterfaceObj kind="cal" var="params" access=".high" scaling="scID82" />
+			</Interface>
+		</Function>
+	</Functions>
+	<Scalings>
+		<Scaling id="scID82" lsb="1.0" offset="0.0" />
+	</Scalings>
+</CodeModel>

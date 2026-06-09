@@ -1,0 +1,28 @@
+{
+  "version":"1.1",
+  "metaData":{
+    "name":"activation_conditions_met",
+    "scopePath":"seat_heating_controller.c:1:seat_heating_controller",
+    "architecture":"seat_heating_controller [C-Code]",
+    "length":"1",
+    "type":"Non-initial",
+    "isPartial":"true"
+  },
+  "vectorContent":{
+    "steps":[ {
+      "step":{
+        "number":"0",
+        "inputs":[ {
+          "seatOccupied":"1"
+        }, {
+          "powerMgtState":"1"
+        }, {
+          "errorStatus":"#RTE_OK"
+        } ]
+      }
+    } ]
+  },
+  "interface":{
+    "inputs":[ "seatOccupied", "powerMgtState", "errorStatus" ]
+  }
+}
