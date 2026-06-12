@@ -341,3 +341,11 @@ def dump_testresults_junitxml(
     tree = ET.ElementTree(testsuites)
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     tree.write(output_file, encoding='utf-8', xml_declaration=True)
+
+def open_profile(ep, profile_path, message=None):
+    # open the profile using the correct endpoint:
+    # "profiles/{profile_path}" is deprecated since EP 25.3
+    if ep.version and ep.version < '25.3':
+        return ep.get(f'profiles/{profile_path}?discardCurrentProfile=true', message=message)
+    else:
+        return ep.get(f'openprofile?path={profile_path}', message=message)

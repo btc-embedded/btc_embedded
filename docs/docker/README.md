@@ -25,12 +25,15 @@ This docker image enables you to easily package your toolchain for CI. Whether y
 # Supported versions
 | Tag               | Supported MATLAB versions | Supported TargetLink versions |
 |-------------------|---------------------------|-------------------------------|
-| `latest` `24.3p0` | R2022b - R2024b           | TL 5.2 - TL 23.1              |
-| `24.2p0`          | R2022b - R2024a           | TL 5.2 - TL 23.1              |
-| `24.1p0`          | R2022b - R2023b           | TL 5.2 - TL 23.1              |
-| `23.3p0`          | R2022b - R2023b           | TL 5.2 - TL 23.1              |
-| `23.2p0`          | R2022b - R2023a           | TL 5.2 - TL 22.1              |
-| `23.1p0`          | R2022b                    | TL 5.2 - TL 22.1              |
+| `latest` `25.3p0` | R2022b - R2024b           | TL 5.2 - TL 23.1              |
+| `25.2p0`          | R2022b - R2024b           | TL 5.2 - TL 23.1              |
+| `25.1p0`          | R2022b - R2024b           | TL 5.2 - TL 23.1              |
+| `24.3p0`          | R2020b - R2024b           | TL 5.2 - TL 23.1              |
+| `24.2p0`          | R2020b - R2024a           | TL 5.2 - TL 23.1              |
+| `24.1p0`          | R2020b - R2023b           | TL 5.2 - TL 23.1              |
+| `23.3p0`          | R2020b - R2023b           | TL 5.2 - TL 23.1              |
+| `23.2p0`          | R2020b - R2023a           | TL 5.2 - TL 22.1              |
+| `23.1p0`          | R2020b - R2022b           | TL 5.2 - TL 22.1              |
 
 For more information on working with MATLAB and TargetLink check out the section "Testing MATLAB Simulink Models" below.
 <br><br>

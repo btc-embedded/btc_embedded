@@ -56,7 +56,7 @@ Use the following required decision prompts when applicable:
     Ask only if no test case files can be found.
 
 - **Artifacts and output locations:**
-    Propose exporting all standard artifacts into a `results/` folder (`test_report.html`, profile `*.epp`, JUnit XML, logs), then ask:
+    Propose exporting standard artifacts into a `results/` folder (`test_report.html`, profile `*.epp`, JUnit XML), then ask:
     - whether they need all artifacts
     - whether any artifact should be written to a different location
 
@@ -72,7 +72,8 @@ Use the following required decision prompts when applicable:
 ## Ground Rules
 
 - **Always verify endpoints against `references/openapi-specs/openapi*.json`** before writing or fixing API calls (if EP version is unknown, ask the user). The spec is authoritative; do not rely on memory or the `btc_embedded` source for endpoint paths and field names.
-- By default, propose exporting standard artifacts to a `results/` subfolder (`test_report.html`, `test_run.log`, `test_results.xml`, `test_project.epp`), but confirm with the user which artifacts are required and whether any paths should differ.
+- By default, propose exporting standard artifacts to a `results/` subfolder (`test_report.html`, `test_results.xml`, `test_project.epp`), but confirm with the user which artifacts are required and whether any paths should differ.
+- Keep logging configuration minimal unless explicitly requested by the user. Default behavior is BTC output at level INFO to STDOUT.
 - All file paths passed to the API must be absolute (`os.path.abspath(...)`).
 - **Do not call `ep.delete('profiles')` before `ep.post('profiles')`** — `ep.post('profiles')` automatically discards any currently active profile.
 - **When an endpoint requires a scope UID, retrieve it from the scopes list:**
@@ -219,22 +220,6 @@ ep.close_application()  # always call in a finally block
 
 Long-running operations return HTTP 202 with a `jobID`; `ep.post/put` poll until complete and return the final result directly.
 
-## Logging Setup
-
-Set up handlers on the `btc_embedded` logger **before** creating `EPRestApi`. The library only adds its own console handler when none exist — preempt it so output goes to both console and file:
-
-```python
-logger = logging.getLogger('btc_embedded')
-logger.setLevel(logging.INFO)
-fmt = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-for handler in [logging.StreamHandler(),
-                logging.FileHandler('results/test_run.log')]:
-    handler.setFormatter(fmt)
-    logger.addHandler(handler)
-```
-
----
-
 ## On-Demand Deep Dives
 
 Use these only when the user specifically needs deeper guidance:
@@ -242,3 +227,5 @@ Use these only when the user specifically needs deeper guidance:
 - Docker CI details: [references/docs/docker-ci.md](references/docs/docker-ci.md)
 - Migration testing (EC/TL + custom C-code): [references/docs/migration-testing.md](references/docs/migration-testing.md)
 - API version-to-version breaking changes: [references/docs/api-changelog.md](references/docs/api-changelog.md)
+- Optional logging setup and patterns: [references/docs/logging.md](references/docs/logging.md)
+- Setup issues and runtime errors (Windows, REST AddOn, unexpected EP version, architecture import failures): [references/docs/troubleshooting.md](references/docs/troubleshooting.md)

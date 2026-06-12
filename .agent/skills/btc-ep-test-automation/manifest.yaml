@@ -1,8 +1,9 @@
 name: btc-ep-test-automation
-version: 0.2.0
+version: 0.3.0
 description: "Automate BTC EmbeddedPlatform test workflows using Python and the btc_embedded REST API wrapper."
 entry: SKILL.md
 references:
+  - references/docker
   - references/examples
   - references/docs
   - references/openapi-specs

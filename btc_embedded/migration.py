@@ -411,7 +411,7 @@ def tgt_05_update_and_interface_check(ep, epp_file, model_path, script_path, sco
         clear_sl_cachefiles(os.path.dirname(model_path))
 
         # load BTC EmbeddedPlatform profile (*.epp) -> Update Model
-        ep.get(f'profiles/{epp_file}?discardCurrentProfile=true', message="Migrating profile to " + ep.version)
+        util.open_profile(ep, epp_file, "Migrating profile to " + ep.version)
 
         # check for interface changes (part 1)
         scope_uid = get_scope_uid(ep, scope_name)
