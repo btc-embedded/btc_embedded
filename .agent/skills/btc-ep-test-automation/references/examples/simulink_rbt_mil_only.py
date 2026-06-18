@@ -3,7 +3,6 @@ Example: Simulink RBT MIL Only Test Automation
 """
 
 import glob
-import logging
 import os
 import sys
 from datetime import datetime
@@ -18,15 +17,6 @@ EPP_FILE = os.path.abspath('my_sl_model.epp')
 RESULTS_EPP = os.path.join(RESULTS_DIR, 'my_sl_model.epp')
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
-
-# Set up logging
-logger = logging.getLogger('btc_embedded')
-logger.setLevel(logging.INFO)
-fmt = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-for handler in [logging.StreamHandler(),
-                logging.FileHandler(os.path.join(RESULTS_DIR, 'test_run.log'))]:
-    handler.setFormatter(fmt)
-    logger.addHandler(handler)
 
 start_time = datetime.now()
 ep = None
@@ -90,10 +80,10 @@ try:
         output_file=os.path.join(RESULTS_DIR, 'test_results.xml')
     )
     
-    logger.info("Test execution completed successfully.")
+    print("Test execution completed successfully.")
 
 except Exception as e:
-    logger.error(f"Test execution failed: {e}")
+    print(f"Test execution failed: {e}")
     sys.exit(1)
 finally:
     if ep:

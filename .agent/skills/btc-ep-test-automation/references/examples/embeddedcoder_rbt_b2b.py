@@ -3,7 +3,6 @@ Example: EmbeddedCoder RBT + B2B Test Automation
 """
 
 import glob
-import logging
 import os
 import sys
 from datetime import datetime
@@ -19,15 +18,6 @@ EC_INIT_SCRIPT = os.path.abspath('model/init_Wrapper_my_ec_model.m')
 EPP_FILE = os.path.join(RESULTS_DIR, 'my_ec_model.epp')
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
-
-# Set up logging
-logger = logging.getLogger('btc_embedded')
-logger.setLevel(logging.INFO)
-fmt = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-for handler in [logging.StreamHandler(),
-                logging.FileHandler(os.path.join(RESULTS_DIR, 'test_run.log'))]:
-    handler.setFormatter(fmt)
-    logger.addHandler(handler)
 
 start_time = datetime.now()
 ep = None
@@ -105,10 +95,10 @@ try:
         output_file=os.path.join(RESULTS_DIR, 'test_results.xml')
     )
     
-    logger.info("Test execution completed successfully.")
+    print("Test execution completed successfully.")
 
 except Exception as e:
-    logger.error(f"Test execution failed: {e}")
+    print(f"Test execution failed: {e}")
     sys.exit(1)
 finally:
     if ep:
