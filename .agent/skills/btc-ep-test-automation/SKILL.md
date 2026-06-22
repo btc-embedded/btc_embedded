@@ -1,6 +1,6 @@
 ---
 name: btc-ep-test-automation
-description: Automate BTC EmbeddedPlatform test workflows by writing Python scripts using the btc_embedded module. Use this skill whenever someone needs to create, fix, or extend a Python script that interacts with the BTC EmbeddedPlatform REST API — including running Requirements-Based Tests (RBT), Back-to-Back Tests (B2B), importing architectures or test cases, generating reports, or saving profiles. Also use this skill when someone asks about btc_embedded API endpoints, request/response formats, or correct usage of EPRestApi.
+description: Automate BTC EmbeddedPlatform test workflows by writing Python scripts using the btc_embedded module. Use this skill whenever someone needs to create, fix, or extend a Python script that interacts with the BTC EmbeddedPlatform REST API — including running Requirements-Based Tests (RBT), Back-to-Back Tests (B2B), Formal Test, Formal Verification, importing architectures/test cases/specifications, generating reports, or saving profiles. Also use this skill when someone asks about btc_embedded API endpoints, request/response formats, or correct usage of EPRestApi.
 ---
 
 # BTC EmbeddedPlatform Test Automation
@@ -19,8 +19,55 @@ For common workflows, refer to these ready-to-use example scripts in `references
 - **`migration_suite_mbd.py`** — Multi-model migration suite using `migration_suite_source()` + `migration_suite_target()`. Two-phase pattern for Docker-based environment testing. MATLAB R2024b, EP 25.3p0.
 - **`migration_test_ccode.py`** — Custom migration test for a single C-code component. Defines `migration_source_ccode()` and `migration_target_ccode()` functions, then calls them. EP 25.3p0.
 - **`migration_suite_ccode.py`** — Custom migration suite for multiple C-code components. Defines `migration_suite_source_ccode()` and `migration_suite_target_ccode()` which loop over components calling the source/target functions. Two-phase pattern for Docker-based environment testing. EP 25.3p0.
+- **`formal_test_new_profile.py`** — C-code Formal Test workflow that starts with a new profile, imports architecture + test cases + SPEC files, executes SIL test execution and formal test, then reports formal requirement coverage/status.
+- **`formal_verification_new_profile.py`** — C-code Formal Verification workflow that starts with a new profile, imports architecture + SPEC files, creates and executes proofs, then reports proof outcomes and formal verification report.
+- **`formal_test_verification_existing_profile.py`** — Combined Formal Test + Formal Verification workflow that starts from an existing profile, updates architecture, assumes tests/specs are already present, then runs both analyses and exports reports.
 
 These examples follow all ground rules below and can serve as templates for custom workflows.
+
+## Formal Methods Overview
+
+Formal Methods in BTC EmbeddedPlatform use Formal Specifications (SPEC) to unambiguously define requirement intent in machine-readable form.
+
+### Formal Specification Process
+
+1. Identify key requirements and constraints from the natural-language requirement.
+2. Create macros that map requirement phrases to placeholders in the formalized requirement.
+3. Define each macro precisely using the SUT interface and signal semantics.
+4. Use these macros in a universal pattern (trigger, action, timing, exit condition, etc.).
+
+Formal Specification helps reveal ambiguities and inconsistencies and produces Formal Requirements (Formal Specs).
+
+### Validation and Verification Modes
+
+- **Requirements coverage (formal):** checks whether tests truly exercise formal trigger conditions and whether expected actions are observed according to the formalized requirement.
+- **Formal Verification:** proves whether the SUT satisfies formal requirements.
+- **Formal Test:** checks behavior against formal requirements on top of existing test executions.
+
+### Formal Test Workflow
+
+1. Choice node:
+    - 1a. Create a profile, import architecture, import test cases and SPEC files.
+    - 1b. Load a profile, update architecture, and if test/spec files exist in workspace ask whether to import.
+2. Execute tests on SIL.
+3. Execute formal test.
+4. Report results (test results, code coverage, formal test results, formal requirements coverage).
+5. Create reports and save artifacts.
+
+### Formal Verification Workflow
+
+1. Choice node:
+    - 1a. Create a profile, import architecture, import SPEC files.
+    - 1b. Load a profile, update architecture, and if SPEC files exist in workspace ask whether to import.
+2. Execute proofs for each formal requirement.
+3. Report results (proof results, formal requirements coverage).
+4. Create reports and save artifacts.
+
+### Formal Requirement Status (FR Status SIL)
+
+- **Fulfilled:** trigger observed and specified action occurred.
+- **Violated:** trigger observed but specified action did not occur.
+- **Inconclusive:** trigger never occurred in the executed tests.
 
 ## User Interaction Pattern
 
@@ -50,10 +97,23 @@ Use the following required decision prompts when applicable:
     - otherwise -> create a new profile and import architecture based on discovered files (`*.slx` for model-based, `CodeModel.xml` for C-code)
     Do not ask this as a default decision unless multiple candidate profiles exist and a choice is required.
 
+    **Profile Format Reference:**
+    There are two types of profiles (test projects):
+    - **EPP**: a binary blob (zip file with metadata and object-db files) containing the full database.
+    - **EPX**: a JSON file (`profile-name.epx`) + a companion folder (`profile-name_btcdata`) with configuration and test data in readable, git-friendly formats (mostly JSON, some legacy XMLs).
+    
+    When working with EPX profiles, do not attempt to import artifacts from the `profile-name_btcdata` folder—these files are automatically imported by BTC when an `*.epx` profile is loaded.
+
 - **RBT project without an existing test project:**
     Auto-discover and import test cases when possible:
     - if a folder contains `*.tc` or `*.tc.json`, import them directly (exclude `*.ui_settings.tc*`)
     Ask only if no test case files can be found.
+
+- **Formal Methods project (Formal Test and/or Formal Verification):**
+    Auto-discover and import formal specification files when possible:
+    - if a folder contains `*.spec`, import all such files
+    If Formal Test is requested, also auto-discover test cases as in the RBT rule above.
+    Ask only if no required artifacts are found (for example, no SPEC files for Formal Verification, or no test cases for Formal Test).
 
 - **Artifacts and output locations:**
     Propose exporting standard artifacts into a `results/` folder (`test_report.html`, profile `*.epp`, JUnit XML), then ask:
@@ -93,6 +153,56 @@ Use the following required decision prompts when applicable:
     Include: files ending with `.tc.json`. Exclude: files ending with `.ui_settings.tc.json`. Do not include all `*.json` files — `*.tcm.json` are test macros imported automatically if referenced by test cases.
 
     When there are `.tc` files instead of `*.tc.json` files, include `*.tc` files and exclude `*.ui_settings.tc` files similarly.
+
+- **When importing formal specifications, use the SPEC import endpoint and absolute paths:**
+    ```python
+    spec_files = sorted(glob.glob(os.path.join(SPECS_DIR, '*.spec')))
+    for spec_file in spec_files:
+        ep.post(
+            'specifications-import',
+            {'specPath': spec_file, 'scopeId': scope_uid, 'optionParam': 'OVERWRITE'},
+            message=f'Importing formal specification: {os.path.basename(spec_file)}',
+        )
+    ```
+
+- **For Formal Test workflows, execute SIL test execution before formal test and then query formal test status:**
+    ```python
+    ep.post(
+        f'scopes/{scope_uid}/test-execution-rbt',
+        {'execConfigNames': ['SIL']},
+        message='Running Requirements-Based Tests (SIL) before Formal Test',
+    )
+    ep.post('execute-formal-test', message='Executing formal test')
+    fr_status = ep.get(f'scopes/{scope_uid}/formal-test-results?execution-config-name=SIL')
+    ```
+
+- **For Formal Verification workflows, create and execute proofs for formal requirements in the scope:**
+    ```python
+    formal_requirements = ep.get(f'scopes/{scope_uid}/formal-requirements')
+    proof_uids = [ep.post(f"proofs/{fr['uid']}", message='Creating proof')['uid']
+                  for fr in formal_requirements]
+    proof_results = ep.post(
+        'proofs/execute',
+        {'proofUIDs': proof_uids, 'strategy': 'BALANCED'},
+        message='Executing proofs for formal verification',
+    )
+    ```
+
+- **Create dedicated reports for formal workflows and export them via `/reports/{uid}`:**
+    ```python
+    formal_test_report = ep.post(
+        f'scopes/{scope_uid}/formal-test-reports',
+        {'executionConfigNames': ['SIL']},
+        message='Creating formal test report',
+    )
+    formal_verification_report = ep.post(
+        f'scopes/{scope_uid}/formal-verification-reports',
+        message='Creating formal verification report',
+    )
+    ep.post(f'reports/{formal_test_report["uid"]}',
+            {'exportPath': RESULTS_DIR, 'newName': 'formal_test_report'},
+            message='Exporting formal test report')
+    ```
 
 - **Add `message=` to `ep.post`, `ep.put`, and `ep.delete` calls** so runtime logs clearly describe each step. `ep.get(...)` calls do not need messages (they are fast). Message text should state intent, for example:
     ```python
