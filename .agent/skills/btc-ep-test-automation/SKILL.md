@@ -132,6 +132,25 @@ Use the following required decision prompts when applicable:
 ## Ground Rules
 
 - **Always verify endpoints against `references/openapi-specs/openapi*.json`** before writing or fixing API calls (if EP version is unknown, ask the user). The spec is authoritative; do not rely on memory or the `btc_embedded` source for endpoint paths and field names.
+
+- **For EP versions prior to 24.3, no reference spec is available in this skill.** If the user is working with such a version and encounters `400 Bad Request` or `404 Not Found` responses, the bundled specs may not match. Resolve this as follows:
+    - **If EP is already running:** query the live spec directly:
+        ```python
+        ep.get('openapi.json')
+        ```
+    - **If EP is not running:** propose creating a small helper script to start that EP version and extract the spec:
+        ```python
+        import json, sys
+        from btc_embedded import EPRestApi
+
+        ep = EPRestApi(version={sys.argv[1]}) # starts EP of the requested version
+        spec = ep.get('openapi.json')
+        with open(f'openapi_{sys.argv[1]}.json', 'w') as f:
+            json.dump(spec, f, indent=2)
+        ep.close_application()
+        ```
+        Run with `python dump_api.py <version>`, e.g. `python dump_api.py 23.3p0`.
+    Use the retrieved spec as the authoritative reference for that version instead of the bundled files.
 - By default, propose exporting standard artifacts to a `results/` subfolder (`test_report.html`, `test_results.xml`, `test_project.epp`), but confirm with the user which artifacts are required and whether any paths should differ.
 - Keep logging configuration minimal unless explicitly requested by the user. Default behavior is BTC output at level INFO to STDOUT.
 - All file paths passed to the API must be absolute (`os.path.abspath(...)`).

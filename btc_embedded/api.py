@@ -537,8 +537,8 @@ class EPRestApi:
         return response
 
     def _poll_long_running(self, jobID):
-        # before 21.3, the jobID was appended to the URL, after 21.3 it is passed as a query parameter
-        if self.version and self.version < '21.3p0':
+        # before 22.3, the jobID was appended to the URL, after 22.3 it is passed as a query parameter
+        if self.version and self.version < '22.3p0':
             return self.get_req('/progress/' + jobID)
         else:
             return self.get_req('/progress?progress-id=' + jobID)
