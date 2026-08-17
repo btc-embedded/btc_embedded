@@ -162,7 +162,7 @@ Use the following required decision prompts when applicable:
     toplevel_scope_uid = toplevel_scope['uid']
     ```
 
-- **When the user explicitly mentions dummy scopes or asks to handle them,** add a `prevent_dummy` helper that returns the scope's direct children when the toplevel scope has `kind == 'DUMMY'`, and `[scope]` otherwise. Do not add this to scripts unless it is explicitly requested.
+- **When the user explicitly mentions dummy scopes or asks to handle them for vector generation,** add a `prevent_dummy` helper and use it to determine the target scopes for `coverage-generation`. It returns `[scope]` normally, or the toplevel's direct children when `kind == 'DUMMY'`. Do not add this to scripts unless it is explicitly requested.
     ```python
     def prevent_dummy(scope, all_scopes):
         """Return [scope] normally, or its direct children if scope is a DUMMY."""
