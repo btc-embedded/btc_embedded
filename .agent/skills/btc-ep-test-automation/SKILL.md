@@ -162,6 +162,31 @@ Use the following required decision prompts when applicable:
     toplevel_scope_uid = toplevel_scope['uid']
     ```
 
+- **When the user explicitly mentions dummy scopes or asks to handle them,** add a `prevent_dummy` helper that returns the scope's direct children when the toplevel scope has `kind == 'DUMMY'`, and `[scope]` otherwise. Do not add this to scripts unless it is explicitly requested.
+    ```python
+    def prevent_dummy(scope, all_scopes):
+        """Return [scope] normally, or its direct children if scope is a DUMMY."""
+        if scope['kind'] != 'DUMMY':
+            return [scope]
+        prefix = scope['path'] + '/'
+        return [
+            s for s in all_scopes
+            if s['path'].startswith(prefix) and '/' not in s['path'][len(prefix):]
+        ]
+    ```
+    Example — vector generation with dummy-scope handling:
+    ```python
+    scopes = ep.get('scopes')
+    toplevel_scope = scopes[0]
+    target_scopes = prevent_dummy(toplevel_scope, scopes)
+    if len(target_scopes) > 1:
+        print(f"Toplevel scope '{toplevel_scope['name']}' is a dummy scope; "
+              f"running vector generation on {len(target_scopes)} subscope(s) instead.")
+
+    for scope in target_scopes:
+        ep.post('coverage-generation', { 'scopeUid': scope['uid'] }, message=f"Generating vectors for scope '{scope['name']}'")
+    ```
+
 - **When importing test cases for RBT, include only real test case files and explicitly exclude UI settings companions:**
     ```python
     tc_files = sorted(
