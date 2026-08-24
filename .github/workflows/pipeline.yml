@@ -1,0 +1,62 @@
+name: Publish package to PyPI
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  checks: write
+  contents: read
+
+jobs:
+  compile-check:
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '#publish') || github.event_name == 'workflow_dispatch') }}
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Compile check (syntax/import-name smoke test, not executed)
+      run: |
+        cat <<'EOF' > _compile_check.py
+        # main BTC TestStack use case
+        from btc_embedded import EPRestApi
+        ep = EPRestApi()
+
+        # llm hook usecase
+        from llm_hook_sdk import ChatResponse, LLMHookBase
+        EOF
+        python -m py_compile _compile_check.py
+
+  publish:
+    needs: [ compile-check ]
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '#publish') || github.event_name == 'workflow_dispatch') }}
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+
+    - name: Build package
+      run: |
+        rm -rf build dist btc_embedded.egg-info
+        python3 -m build
+
+    - name: Upload to PyPI
+      run: python3 -m twine upload dist/* -u __token__
+      env:
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
