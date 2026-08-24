@@ -16,9 +16,23 @@ Discriminated by the ``"type"`` field::
     {"type": "structured", "data": {"key": "value"}}
     {"type": "resource",   "uri": "file://data.csv", "mimeType": "text/csv",         "data": "<base64>"}
     {"type": "resource",   "uri": "file://doc.pdf",  "mimeType": "application/pdf",  "data": "<base64>"}
+    {"type": "reasoning",  "text": "...", "signature": "<opaque>",
+                           "origin": {"provider": "aws-bedrock-runtime", "model": "..."}}
 
 For ``resource`` blocks, ``data`` is always base64-encoded regardless of whether the underlying
 content is text or binary. Use ``mimeType`` to determine how to decode and handle the content.
+
+``reasoning`` blocks carry a model's reasoning ("thinking"). They exist to be transported, not
+displayed: a model may require them echoed back verbatim on later requests. Rules for hooks:
+
+* Every payload field is optional and an empty ``text`` is normal; redacted reasoning carries only
+  an opaque base64 ``redactedContent``. Never drop a reasoning block for being empty.
+* Echo the payload back unchanged — the signature is computed over the original reasoning.
+* Skip blocks whose ``origin.provider`` or ``origin.model`` is not the hook's own; a foreign
+  signature is not verifiable and replaying it fails the request. Ignore unknown ``origin`` fields.
+
+Unrecognised block types must be skipped with a warning naming the type, never forwarded blindly
+and never coerced into another type.
 """
 
 

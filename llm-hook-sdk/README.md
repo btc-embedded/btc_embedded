@@ -1,6 +1,6 @@
 # llm-hook-sdk
 
-`llm-hook-sdk` contains the shared protocol types (`Message`, `Tool`, `ChatResponse`, etc.) and the `LLMHookBase` stdin/stdout loop that the Java plugin talks to. Provider-specific code lives outside the package, for example in `examples\aws_bedrock_hook.py`.
+`llm-hook-sdk` contains the shared protocol types (`Message`, `Tool`, `ChatResponse`, etc.) and the `LLMHookBase` stdin/stdout loop that the Java plugin talks to. Provider-specific code lives outside the package, for example in `examples\aws_sonnet_4-6_hook.py`.
 
 ## Package layout
 
@@ -9,7 +9,8 @@ llm-hook-sdk/
 ├── pyproject.toml
 ├── README.md
 ├── examples/
-│   └── aws_bedrock_hook.py
+│   ├── aws_sonnet_4-6_hook.py
+│   └── aws_sonnet_5_hook.py
 └── src/
     └── llm_hook_sdk/
         ├── __init__.py
@@ -21,22 +22,21 @@ llm-hook-sdk/
         └── py.typed
 ```
 
-## Install locally
+## Installation
 
-Create and activate a virtual environment, then install the package from source:
+**From PyPI:**
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e .
+```bash
+pip install llm-hook-sdk
 ```
 
-If you want to run the Bedrock example too, install the optional dependency group:
+**From a local copy:**
 
-```powershell
-python -m pip install -e ".[bedrock]"
+```bash
+pip install ./llm-hook-sdk
 ```
+
+The SDK has no external dependencies of its own. If your hook needs a provider-specific package (e.g. `boto3` for AWS Bedrock, `openai` for OpenAI), install it alongside the SDK.
 
 ## Public API
 
@@ -83,10 +83,13 @@ if __name__ == "__main__":
     MyHook().run()
 ```
 
-## Bedrock example
+## Bedrock examples
 
-An AWS Bedrock implementation is included at:
+AWS Bedrock implementations are included at:
 
 ```text
-examples/aws_bedrock_hook.py
+examples/aws_sonnet_4-6_hook.py
+examples/aws_sonnet_5_hook.py
 ```
+
+Note: these examples require `boto3` to be installed.
