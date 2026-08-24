@@ -62,10 +62,15 @@ class LLMHookBase(ABC):
 
                 try:
                     request = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    sys.stderr.write(f"Invalid JSON hook request: {exc}\n")
+                    sys.stderr.flush()
+                    self._send_error(f"Invalid JSON: {exc}")
+                    continue
+
+                try:
                     response = self._handle_request(request)
                     self._send_response(response)
-                except json.JSONDecodeError as exc:
-                    self._send_error(f"Invalid JSON: {exc}")
                 except Exception as exc:
                     sys.stderr.write(f"ERROR: {traceback.format_exc()}\n")
                     sys.stderr.flush()
