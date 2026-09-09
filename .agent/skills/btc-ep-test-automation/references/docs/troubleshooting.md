@@ -28,6 +28,14 @@ Uninstall and reinstall BTC EmbeddedPlatform, making sure to select the REST Ser
 - Override via constructor: `ep = EPRestApi(version="25.3p0")`
 - Or edit `%PROGRAMDATA%/BTC/ep/btc_config.yml` (or whichever file `BTC_API_CONFIG_FILE` points to) to change the default version.
 
+### 4. `tasklist` fails with "Access is denied" for a restricted Windows user (e.g. Jenkins service account)
+
+`EPRestApi()` uses the `tasklist` command internally to clean up its port registry (an optimization used to avoid port collisions when multiple EP instances run on the same machine). On hardened Windows systems, a non-admin service account can be blocked from enumerating processes (via AppLocker/Software Restriction Policies, WMI permissions on `root\cimv2`, or an EDR/AV policy) even without needing admin rights.
+
+**Recommended action:**
+- Update to `btc_embedded` >= 26.1.5 — it catches this failure and skips the (non-essential) port registry cleanup with a warning instead of aborting the script.
+- Running the Jenkins agent as a non-admin user is fine and does not need to change; a full fix on very old versions would require granting that account rights to enumerate processes, but is no longer necessary once updated.
+
 ---
 
 ## Common runtime errors for model-based projects

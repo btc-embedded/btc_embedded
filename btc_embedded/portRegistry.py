@@ -66,7 +66,17 @@ def removeOutdatedRegs(portInfos):
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     startupinfo.wShowWindow = subprocess.SW_HIDE
 
-    runningProcesses = subprocess.check_output('tasklist', startupinfo=startupinfo).decode().replace(" ","")
+    try:
+        runningProcesses = subprocess.check_output('tasklist', startupinfo=startupinfo).decode().replace(" ","")
+    except (subprocess.CalledProcessError, OSError) as e:
+        # e.g. 'tasklist' is blocked for this user by a Windows security policy (AppLocker, WMI
+        # permissions, EDR/AV). This registry is only an optimization for picking a free port
+        # (the authoritative check is a live socket connect in _find_next_port), so we skip the
+        # stale-entry cleanup instead of failing the whole EPRestApi startup.
+        logger.warning(f"Could not run 'tasklist' to clean up the port registry ({e}). "
+                        "Skipping stale entry cleanup; this does not affect test execution.")
+        return portInfos
+
     updatedRegistrations = [[reg[0],reg[1]] for reg in portInfos if "ep.exe"+reg[0] in runningProcesses]
 
     with open(portReg, 'w',newline='') as f:
