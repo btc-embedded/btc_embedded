@@ -64,7 +64,8 @@ class EPRestApi:
         skip_matlab_start=False,
         skip_config_install=False,
         log_level=logging.INFO,
-        force_new_port=False):
+        force_new_port=False,
+        skip_proxy=False):
         """
         Wrapper for the BTC EmbeddedPlatform REST API.
         When created without arguments, it uses the default install location & version defined in the global config (btc_config.yml).
@@ -83,6 +84,7 @@ class EPRestApi:
         - skip_config_install (bool): Skips the automatic installation of a global btc_config.yml on your machine (default: False).
         - log_level (int): The log level to use for the logger (default: logging.INFO).
         - force_new_port (bool): If true will not connect to running instance of EP and instead search for open port. Increments from provided port. (default: False)
+        - skip_proxy (bool): If true will not use the proxy on the machine to execute the REST API requests to EP. (default: False) 
         """
 
         self.log_level = log_level
@@ -115,6 +117,10 @@ class EPRestApi:
                 host_no_protocol = self._HOST_.replace("http://","").replace("https://","")
                 self._PORT_ = str(self._find_next_port(int(self._PORT_), host_no_protocol,portInfos))
             
+            # Don't use proxy for localhost (both spellings are relevant on non-windows OS)
+            if skip_proxy:
+                os.environ["NO_PROXY"] = "localhost,127.0.0.1"
+                os.environ["no_proxy"] = "localhost,127.0.0.1"
 
             #
             # Prepare configuration
