@@ -16,6 +16,7 @@
 !*.template
 !Dockerfile
 !.gitignore
+!.gitattributes
 !*.bash
 !*.ps1
 !*.toml
