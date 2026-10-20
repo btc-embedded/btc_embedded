@@ -27,12 +27,14 @@ def _get_mil_config(exec_config_names, context=''):
     suffix = f" in {context}" if context else ""
     raise Exception(f"No MIL execution config found{suffix}. Available configs: {exec_config_names}")
 
-def migration_suite_source(models, matlab_version, toolchain_script=None, test_mil=False, export_executions=False, reuse_code=False, vector_gen_settings=None, ep=None):
+def migration_suite_source(models, matlab_version, toolchain_script=None, test_mil=False, export_executions=False, reuse_code=False, vector_gen_settings=None, ep=None, close_models=False):
     """For each of the given models this function generates tests for
     full coverage on the given model using the specified Matlab version,
     then performs a MIL and SIL simulation to record the reference behavior.
     
     models: list of dicts with keys 'model' (mandatory), 'script', 'scopeName', 'environmentXml' (optional)
+
+    close_models: if True, all models are closed in Matlab without saving before EmbeddedPlatform is closed.
 
     In order to pass custom vector generation settings, provide a dictionary
     with the structure accepted by the vector generation endpoint. You only need
@@ -58,10 +60,11 @@ def migration_suite_source(models, matlab_version, toolchain_script=None, test_m
             reuse_code=reuse_code,
             vector_gen_settings=vector_gen_settings)
 
+    if close_models: _close_matlab_models(ep)
     ep.close_application()
     return model_results
 
-def migration_suite_target(models, matlab_version, model_results=None, accept_interface_changes=False, test_mil=False, toolchain_script=None, reuse_code=False, ep=None):
+def migration_suite_target(models, matlab_version, model_results=None, accept_interface_changes=False, test_mil=False, toolchain_script=None, reuse_code=False, ep=None, close_models=False):
     """For each of the given models this function
     imports the reference execution records and simulates the same
     vectors on MIL and SIL based on the specified Matlab version. This
@@ -69,6 +72,8 @@ def migration_suite_target(models, matlab_version, model_results=None, accept_in
     reference execution.
     
     models: list of dicts with keys 'model' (mandatory), 'script', 'scopeName', 'environmentXml' (optional)
+
+    close_models: if True, all models are closed in Matlab without saving before EmbeddedPlatform is closed.
     """
     global report_json; report_json = os.path.abspath(os.path.join('results', 'report.json'))
     
@@ -87,6 +92,7 @@ def migration_suite_target(models, matlab_version, model_results=None, accept_in
             reuse_code=reuse_code)
 
     # close application and create summary report
+    if close_models: _close_matlab_models(ep)
     ep.close_application()
     return model_results
 
@@ -639,6 +645,13 @@ def handle_error(ep, step_result, epp_file=None, error="", step_start_time=None)
         errors_from_log = ep.get_errors_from_log(step_start_time)
         with open(f"{message_report_file[:-13]}error.log", 'w') as log:
             log.writelines(errors_from_log)
+
+def _close_matlab_models(ep):
+    """Closes all models in Matlab without saving."""
+    try:
+        util.close_matlab_models(ep)
+    except Exception as e:
+        logger.warning(f"Could not close the models in Matlab before closing BTC EmbeddedPlatform: {e}")
 
 def start_ep_and_configure_matlab(version, ep):
     if not ep: ep = EPRestApi()
