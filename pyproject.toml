@@ -9,9 +9,10 @@ authors = [
     {name = "Thabo Krick", email = "thabo.krick@btc-embedded.com"},
     {name = "Nathan Drasovean", email = "nathan.drasovean@btc-embedded.com"},
     {name = "Ferdinand Becker", email = "ferdinand.becker@btc-embedded.com"},
+    {name = "Andrei Isar", email = "andrei.isar@btc-embedded.com"},
 ]
 
-version = "26.1.6"
+version = "26.1.7"
 
 license = "MIT"
 description="API wrapper for BTC EmbeddedPlatform REST API"

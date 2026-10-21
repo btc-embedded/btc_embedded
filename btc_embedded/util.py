@@ -45,6 +45,15 @@ def run_matlab_function(ep, matlab_script_abs_path, args=None):
             'inArgs' : args
         })
 
+def close_matlab_models(ep):
+    """Closes all models in Matlab without saving."""
+    ep.post('execute-long-matlab-script',
+        {
+            'scriptName' : 'evalin',
+            'inArgs' : [ 'base', "try, bdclose('all'); catch, end; if exist('dsdd', 'file'), try, dsdd('Close', 'Save', 'off'); catch, end; end" ]
+        },
+        message="Closing all models in Matlab without saving.")
+
 def print_rbt_results(response, coverage_response=None):
     """Example on how to access coverage and test result data.
     Depending on your desired CI-workflow, you would usually not just print

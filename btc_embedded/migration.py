@@ -58,6 +58,7 @@ def migration_suite_source(models, matlab_version, toolchain_script=None, test_m
             reuse_code=reuse_code,
             vector_gen_settings=vector_gen_settings)
 
+    _close_matlab_models(ep)
     ep.close_application()
     return model_results
 
@@ -87,6 +88,7 @@ def migration_suite_target(models, matlab_version, model_results=None, accept_in
             reuse_code=reuse_code)
 
     # close application and create summary report
+    _close_matlab_models(ep)
     ep.close_application()
     return model_results
 
@@ -639,6 +641,13 @@ def handle_error(ep, step_result, epp_file=None, error="", step_start_time=None)
         errors_from_log = ep.get_errors_from_log(step_start_time)
         with open(f"{message_report_file[:-13]}error.log", 'w') as log:
             log.writelines(errors_from_log)
+
+def _close_matlab_models(ep):
+    """Closes all models in Matlab without saving."""
+    try:
+        util.close_matlab_models(ep)
+    except Exception as e:
+        logger.warning(f"Could not close the models in Matlab before closing BTC EmbeddedPlatform: {e}")
 
 def start_ep_and_configure_matlab(version, ep):
     if not ep: ep = EPRestApi()
