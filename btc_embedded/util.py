@@ -50,7 +50,7 @@ def close_matlab_models(ep):
     ep.post('execute-long-matlab-script',
         {
             'scriptName' : 'evalin',
-            'inArgs' : [ 'base', "bdclose('all'); if exist('dsdd', 'file'), dsdd('Close', 'Save', 'off'); end" ]
+            'inArgs' : [ 'base', "try, bdclose('all'); catch, end; if exist('dsdd', 'file'), try, dsdd('Close', 'Save', 'off'); catch, end; end" ]
         },
         message="Closing all models in Matlab without saving.")
 
