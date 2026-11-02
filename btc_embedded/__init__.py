@@ -1,4 +1,5 @@
-from btc_embedded.api import LOGGING_DISABLED, EPRestApi
+from btc_embedded.api import (LOGGING_DISABLED, BtcApiException,
+                              BtcLicenseException, EPRestApi)
 from btc_embedded.config import (get_global_config, get_merged_config,
                                  get_project_specific_config,
                                  get_vector_gen_config)

@@ -41,6 +41,11 @@ EXCLUDED_LOG_MESSAGES = [
     'EpexCompilerServiceImpl - Compilation failed',
     'CurVer (type String) does not exist'
 ]
+LICENSE_ERROR_MESSAGES = [
+    'No licenses for package', # checkout of a license failed
+    'No remote licenses for package', # the same on a remote desktop connection
+    'not covered by current licensed package', # no package covers the needed licensing features
+]
 
 LOGGING_DISABLED = 1337
 
@@ -439,6 +444,9 @@ class EPRestApi:
             elif (not self._connect_only() and not self._is_ep_process_still_alive()):
                 logger.error(f"\n\nApplication failed to start. Please check the log file for further information:\n{self.log_file_path}\n\n")                
                 self.print_log_entries()
+                license_error = self._get_license_error_from_log()
+                if license_error:
+                    raise BtcLicenseException(f"Application failed to start, no license available: {license_error}")
                 raise BtcApiException("Application failed to start.")
             time.sleep(2)
            #print('.', end='')
@@ -934,6 +942,13 @@ class EPRestApi:
     def print_log_entries(self):
         for entry in self.get_errors_from_log(self.start_time): logger.error(entry)
 
+    def _get_license_error_from_log(self):
+        """Returns the first error entry of this start saying that the licenses could not be checked out, or None"""
+        for entry in self.get_errors_from_log(self.start_time):
+            if any(message in entry for message in LICENSE_ERROR_MESSAGES):
+                return entry
+        return None
+
     def _init_logging(self):
         logger.setLevel(self.log_level)
         # if logging is not disabled and there are no handlers -> add console handler
@@ -999,6 +1014,10 @@ class EPRestApi:
 
 class BtcApiException(Exception):
     """Custom exception for BTC EmbeddedPlatform API errors."""
+    pass
+
+class BtcLicenseException(BtcApiException):
+    """BTC EmbeddedPlatform could not be started because its licenses could not be checked out."""
     pass
 
 # if called directly, starts EP based on the global config
