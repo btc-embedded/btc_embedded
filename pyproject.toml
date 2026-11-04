@@ -12,7 +12,7 @@ authors = [
     {name = "Andrei Isar", email = "andrei.isar@btc-embedded.com"},
 ]
 
-version = "26.1.7"
+version = "26.1.8"
 
 license = "MIT"
 description="API wrapper for BTC EmbeddedPlatform REST API"
