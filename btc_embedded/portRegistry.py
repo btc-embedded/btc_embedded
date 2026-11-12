@@ -67,7 +67,7 @@ def removeOutdatedRegs(portInfos):
     startupinfo.wShowWindow = subprocess.SW_HIDE
 
     try:
-        runningProcesses = subprocess.check_output('tasklist', startupinfo=startupinfo).decode().replace(" ","")
+        runningProcesses = subprocess.check_output('tasklist', startupinfo=startupinfo).decode(errors="ignore").replace(" ","")
     except (subprocess.CalledProcessError, OSError) as e:
         # e.g. 'tasklist' is blocked for this user by a Windows security policy (AppLocker, WMI
         # permissions, EDR/AV). This registry is only an optimization for picking a free port
